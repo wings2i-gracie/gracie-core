@@ -1,0 +1,30 @@
+{
+  "name": "@wings2i-gracie/core",
+  "version": "0.1.0",
+  "description": "Tier 1 platform package for the GRACie suite",
+  "private": false,
+  "main": "dist/server/src/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wings2i-gracie/gracie-core.git"
+  },
+  "dependencies": {
+    "@wings2i-gracie/contracts": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "prisma": "^6.0.0",
+    "typescript": "^6.0.3"
+  }
+}
