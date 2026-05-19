@@ -31,3 +31,8 @@ E1.2 (2026-05-19) — Initial skeleton. server/src/index.ts + client/src/index.t
   stubs, prisma/schema.prisma (datasource + generator, no models), package.json,
   tsconfig.json (Node16/node16), .npmrc, .gitignore, publish workflow.
   Depends on @wings2i-gracie/contracts@^0.1.0. v0.1.0 published.
+E1.3 (2026-05-19) — CI/CD scaffolding. Added .github/workflows/ci.yml
+  (typecheck, lint, dep-direction, prisma-check jobs). Added
+  .github/workflows/publish.yml with NODE_AUTH_TOKEN on both npm ci and
+  npm publish steps using PACKAGES_TOKEN. Added ESLint devDependencies
+  (eslint@^8, @typescript-eslint/parser+plugin@^8) and .eslintrc.json.
