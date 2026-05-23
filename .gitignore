@@ -3,3 +3,4 @@ dist/
 *.tsbuildinfo
 .env
 .claude/
+server/src/generated/

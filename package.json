@@ -1,14 +1,16 @@
 {
   "name": "@wings2i-gracie/core",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "description": "Tier 1 platform package for the GRACie suite",
   "private": false,
   "main": "dist/server/src/index.js",
+  "types": "dist/server/src/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "prisma:generate": "prisma generate",
+    "build": "npm run prisma:generate && tsc && node -e \"require('fs').cpSync('server/src/generated/prisma-client', 'dist/server/src/generated/prisma-client', {recursive:true})\"",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
@@ -20,14 +22,21 @@
     "url": "git+https://github.com/wings2i-gracie/gracie-core.git"
   },
   "dependencies": {
-    "@wings2i-gracie/contracts": "^0.1.0"
+    "@prisma/client": "^7.0.0",
+    "@wings2i-gracie/contracts": "^0.1.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.57.0",
-    "prisma": "^6.0.0",
-    "typescript": "^6.0.3"
+    "prisma": "^7.0.0",
+    "typescript": "^5.5.4"
   }
 }

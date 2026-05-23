@@ -1,8 +1,74 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  output        = "../server/src/generated/prisma-client"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  trial
+  active
+  suspended
+
+  @@map("tenant_status")
+}
+
+enum UserRole {
+  super_admin
+  org_admin
+  compliance_manager
+  leadership
+  function_owner
+  context_owner
+  auditor
+  viewer
+
+  @@map("user_role")
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model CoreTenant {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String
+  slug              String
+  status            TenantStatus @default(trial)
+  org_admin_user_id String?      @db.Uuid
+  created_at        DateTime     @default(now()) @db.Timestamptz
+  updated_at        DateTime     @updatedAt @db.Timestamptz
+  archived_at       DateTime?    @db.Timestamptz
+  archived_by       String?      @db.Uuid
+
+  users CoreUser[]
+
+  @@map("core_tenants")
+}
+
+model CoreUser {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id            String?   @db.Uuid
+  organisation_id      String?   @db.Uuid
+  email                String
+  password_hash        String
+  first_name           String
+  last_name            String
+  role                 UserRole
+  function_id          String?   @db.Uuid
+  location_id          String?   @db.Uuid
+  is_active            Boolean   @default(true)
+  must_change_password Boolean   @default(false)
+  last_login_at        DateTime? @db.Timestamptz
+  created_by           String?   @db.Uuid
+  created_at           DateTime  @default(now()) @db.Timestamptz
+  updated_at           DateTime  @updatedAt @db.Timestamptz
+  deleted_at           DateTime? @db.Timestamptz
+
+  tenant CoreTenant? @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@map("core_users")
 }
