@@ -67,3 +67,28 @@ E2.4 (2026-05-26) — File Storage abstraction.
   server/src/modules/storage/storage.service.ts: uploadFile, getFile, deleteFile,
   getFilesByModule — all tenant-scoped. uploadFile uses same fileId for DB PK and filename prefix.
   index.ts: exports all four service functions + LocalStorageProvider.
+E2.5 (2026-05-26) — Org Context extraction (completed in E2.6 session — gap discovered).
+  prisma/schema.prisma: CoreOrgProfile/CoreFunction/CoreLocation/CoreEntity/CoreOrgStakeholder
+  (@@map to existing Privacy tables); CoreOrgRoleType/CoreOrgRoleAssignment (new tables).
+  server/src/modules/orgContext/orgContext.service.ts: Full CRUD for org profile, functions,
+  locations, entities, stakeholders; registerOrgRoleType(key, label); getRoleAssignment/
+  upsertRoleAssignment; getDpoDetails/upsertDpoDetails wrappers over role assignment API.
+  server/src/modules/orgContext/orgContext.router.ts: Routes at /api/v1/core/org with
+  requireAuth + requireTenant. Profile, DPO, functions, locations (with type filter), entities,
+  stakeholders, role-types.
+  index.ts: exports coreOrgRouter + all 22 org context service functions.
+  v0.2.0-alpha.2 skipped (CLAUDE.md-recorded publish that never happened).
+E2.6 (2026-05-26) — Tasks engine extraction.
+  prisma/schema.prisma: CoreTaskStatus/CoreTaskPriority/CoreTaskSource/CoreTaskRecurrenceFrequency
+  enums (@@map to existing PostgreSQL enum types); CoreTask/CoreTaskSubTask/CoreTaskWatcher/
+  CoreTaskRecurrenceConfig/CoreTaskTemplate models with FK relations.
+  Migration: 20260524000002_e2_6_tasks_extraction — creates 5 core_task* tables, copies data
+  from old Privacy tasks tables via INSERT ... SELECT ... ON CONFLICT DO NOTHING.
+  server/src/modules/tasks/tasks.service.ts: Full tasks engine — createTask, listTasks,
+  getTaskById, updateTask (with sub-tasks/watchers/recurrence in transaction + auto-recurrence
+  on completion), softDeleteTask, getTaskStats, listTemplates, createTemplate,
+  createTaskFromTemplate, seedSystemTemplates, advanceDueDate helper.
+  server/src/modules/tasks/tasks.router.ts: Routes at /api/v1/core/tasks with requireAuth +
+  requireTenant. Full CRUD + stats + templates.
+  index.ts: exports coreTasksRouter + all task service functions + enum types.
+  v0.2.0-alpha.3 tagged.

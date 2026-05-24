@@ -1,6 +1,6 @@
 {
   "name": "@wings2i-gracie/core",
-  "version": "0.2.0-alpha.1",
+  "version": "0.2.0-alpha.3",
   "description": "Tier 1 platform package for the GRACie suite",
   "private": false,
   "main": "dist/server/src/index.js",

@@ -1,4 +1,4 @@
-// @wings2i-gracie/core — E2.3: Audit log service + router extracted from Privacy
+// @wings2i-gracie/core — E2.6: Tasks engine + E2.5: Org Context
 
 export {
   generateAccessToken,
@@ -55,3 +55,58 @@ export {
 } from './modules/storage/storage.service.js';
 
 export { LocalStorageProvider } from './modules/storage/LocalStorageProvider.js';
+
+// ── E2.5: Org Context ─────────────────────────────────────────────────────────
+
+export { default as coreOrgRouter } from './modules/orgContext/orgContext.router.js';
+
+export {
+  getOrgProfile,
+  getOrCreateOrgProfile,
+  upsertOrgProfile,
+  listFunctions,
+  createFunction,
+  updateFunction,
+  deactivateFunction,
+  listLocations,
+  getLocationsByFunction,
+  createLocation,
+  updateLocation,
+  deactivateLocation,
+  listEntities,
+  createEntity,
+  updateEntity,
+  deactivateEntity,
+  listStakeholders,
+  createStakeholder,
+  updateStakeholder,
+  removeStakeholder,
+  registerOrgRoleType,
+  getRoleAssignment,
+  upsertRoleAssignment,
+  getDpoDetails,
+  upsertDpoDetails,
+} from './modules/orgContext/orgContext.service.js';
+
+// ── E2.6: Tasks ───────────────────────────────────────────────────────────────
+
+export {
+  createTask,
+  listTasks,
+  getTaskById,
+  updateTask,
+  softDeleteTask,
+  getTaskStats,
+  listTemplates,
+  createTemplate,
+  createTaskFromTemplate,
+  seedSystemTemplates,
+  CoreTaskStatus,
+  CoreTaskPriority,
+  CoreTaskSource,
+  CoreTaskRecurrenceFrequency,
+  type CreateTaskInput,
+  type ListTasksFilter,
+} from './modules/tasks/tasks.service.js';
+
+export { default as coreTasksRouter } from './modules/tasks/tasks.router.js';

@@ -31,6 +31,56 @@ enum UserRole {
   @@map("user_role")
 }
 
+// Task enums — map to existing PostgreSQL enum types created by Privacy migrations.
+
+enum CoreTaskStatus {
+  todo
+  in_progress
+  waiting
+  done
+  cancelled
+
+  @@map("task_status")
+}
+
+enum CoreTaskPriority {
+  low
+  medium
+  high
+  critical
+
+  @@map("task_priority")
+}
+
+enum CoreTaskSource {
+  manual
+  compliance
+  breach
+  request
+  regulatory
+  review
+  consent
+  pi_contexts
+  notices
+  pbd
+  training
+  template
+  system
+  pims
+
+  @@map("task_source")
+}
+
+enum CoreTaskRecurrenceFrequency {
+  daily
+  weekly
+  monthly
+  quarterly
+  annual
+
+  @@map("task_recurrence_frequency")
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model CoreTenant {
@@ -46,6 +96,7 @@ model CoreTenant {
 
   users     CoreUser[]
   auditLogs CoreAuditLog[]
+  tasks     CoreTask[]
 
   @@map("core_tenants")
 }
@@ -83,15 +134,17 @@ model CoreUser {
   updated_at           DateTime  @updatedAt @db.Timestamptz
   deleted_at           DateTime? @db.Timestamptz
 
-  tenant    CoreTenant?    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  auditLogs CoreAuditLog[]
+  tenant           CoreTenant?       @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  auditLogs        CoreAuditLog[]
+  headedFunctions  CoreFunction[]    @relation("CoreFunctionHead")
+  ownedTasks       CoreTask[]        @relation("CoreTaskOwner")
+  createdTasks     CoreTask[]        @relation("CoreTaskCreator")
+  watchedTasks     CoreTaskWatcher[] @relation("CoreTaskWatcher")
 
   @@map("core_users")
 }
 
 // ─── Model: CoreAuditLog ─────────────────────────────────────────────────────
-// tenant_id nullable — NULL for super_admin cross-tenant actions.
-// organisation_id stored as plain UUID (organisations table is Privacy-specific).
 
 model CoreAuditLog {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -118,9 +171,6 @@ model CoreAuditLog {
 }
 
 // ─── Model: CoreFile ─────────────────────────────────────────────────────────
-// Metadata for files managed via Core's file storage service.
-// uploaded_by is a plain UUID (not a FK relation) — user table is core_users
-// but the FK is omitted so Core stays decoupled from Privacy user lifecycle.
 
 model CoreFile {
   id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -138,4 +188,230 @@ model CoreFile {
   @@index([module_key])
   @@index([uploaded_by])
   @@map("core_files")
+}
+
+// ─── E2.5: Org Context Models ─────────────────────────────────────────────────
+// These @@map to existing Privacy tables (no migrations needed for the tables).
+// core_org_role_types and core_org_role_assignments were created by E2.5 migration.
+
+model CoreOrgProfile {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  name               String
+  website            String?
+  address            String?
+  contact_email      String?
+  contact_phone      String?
+  industry_sector    String?
+  employee_band      String?
+  is_sdf             Boolean   @default(false)
+  is_consent_manager Boolean   @default(false)
+  created_by         String?   @db.Uuid
+  created_at         DateTime  @default(now()) @db.Timestamptz
+  updated_at         DateTime  @updatedAt @db.Timestamptz
+  deleted_at         DateTime? @db.Timestamptz
+
+  @@index([tenant_id])
+  @@map("organisations")
+}
+
+model CoreFunction {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  organisation_id String    @db.Uuid
+  name            String
+  description     String?
+  head_user_id    String?   @db.Uuid
+  created_by      String?   @db.Uuid
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+
+  head_user CoreUser?  @relation("CoreFunctionHead", fields: [head_user_id], references: [id])
+  tasks     CoreTask[]
+
+  @@index([tenant_id])
+  @@map("functions")
+}
+
+model CoreLocation {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                String   @db.Uuid
+  organisation_id          String   @db.Uuid
+  name                     String
+  country_code             String
+  region                   String?
+  is_data_subject_location Boolean  @default(false)
+  is_processing_location   Boolean  @default(false)
+  is_active                Boolean  @default(true)
+  created_by               String?  @db.Uuid
+  created_at               DateTime @default(now()) @db.Timestamptz
+  updated_at               DateTime @updatedAt @db.Timestamptz
+
+  @@index([tenant_id])
+  @@map("locations")
+}
+
+model CoreEntity {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  organisation_id String    @db.Uuid
+  name            String
+  legal_name      String
+  country_code    String
+  is_primary      Boolean   @default(false)
+  created_by      String?   @db.Uuid
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+
+  @@index([tenant_id])
+  @@map("entities")
+}
+
+model CoreOrgStakeholder {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  organisation_id        String    @db.Uuid
+  name                   String
+  role_title             String
+  email                  String?
+  phone                  String?
+  stakeholder_type       String
+  stakeholder_type_other String?
+  function_id            String?   @db.Uuid
+  function_label         String?
+  created_by             String?   @db.Uuid
+  created_at             DateTime  @default(now()) @db.Timestamptz
+  updated_at             DateTime  @updatedAt @db.Timestamptz
+  deleted_at             DateTime? @db.Timestamptz
+
+  @@index([tenant_id])
+  @@map("org_stakeholders")
+}
+
+model CoreOrgRoleType {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key        String   @unique
+  label      String
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  assignments CoreOrgRoleAssignment[]
+
+  @@map("core_org_role_types")
+}
+
+model CoreOrgRoleAssignment {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  role_type_key    String
+  name             String?
+  email            String?
+  phone            String?
+  role_title       String?
+  appointment_date DateTime? @db.Date
+  notes            String?   @db.Text
+  created_by       String?   @db.Uuid
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+
+  role_type CoreOrgRoleType @relation(fields: [role_type_key], references: [key])
+
+  @@unique([tenant_id, role_type_key])
+  @@index([tenant_id])
+  @@map("core_org_role_assignments")
+}
+
+// ─── E2.6: Task Models ────────────────────────────────────────────────────────
+// core_tasks and related tables are created by migration 20260524000002.
+// Old Privacy tasks/* tables are retained (strangler bridge).
+
+model CoreTask {
+  id            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String                  @db.Uuid
+  title         String
+  description   String?                 @db.Text
+  status        CoreTaskStatus          @default(todo)
+  priority      CoreTaskPriority        @default(medium)
+  source        CoreTaskSource          @default(manual)
+  source_id     String?                 @db.Uuid
+  source_module String?
+  owner_id      String                  @db.Uuid
+  function_id   String?                 @db.Uuid
+  due_date      DateTime?               @db.Timestamptz
+  completed_at  DateTime?               @db.Timestamptz
+  created_by    String?                 @db.Uuid
+  created_at    DateTime                @default(now()) @db.Timestamptz
+  updated_at    DateTime                @updatedAt @db.Timestamptz
+  deleted_at    DateTime?               @db.Timestamptz
+
+  tenant     CoreTenant               @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  owner      CoreUser                 @relation("CoreTaskOwner", fields: [owner_id], references: [id])
+  creator    CoreUser?                @relation("CoreTaskCreator", fields: [created_by], references: [id])
+  function   CoreFunction?            @relation(fields: [function_id], references: [id])
+  sub_tasks  CoreTaskSubTask[]
+  watchers   CoreTaskWatcher[]
+  recurrence CoreTaskRecurrenceConfig?
+
+  @@index([tenant_id])
+  @@index([tenant_id, owner_id])
+  @@index([tenant_id, status])
+  @@map("core_tasks")
+}
+
+model CoreTaskSubTask {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id    String   @db.Uuid
+  title      String
+  completed  Boolean  @default(false)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  task CoreTask @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@index([task_id])
+  @@map("core_task_sub_tasks")
+}
+
+model CoreTaskWatcher {
+  task_id String @db.Uuid
+  user_id String @db.Uuid
+
+  task CoreTask  @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user CoreUser  @relation("CoreTaskWatcher", fields: [user_id], references: [id])
+
+  @@id([task_id, user_id])
+  @@map("core_task_watchers")
+}
+
+model CoreTaskRecurrenceConfig {
+  id              String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id         String                      @unique @db.Uuid
+  frequency       CoreTaskRecurrenceFrequency
+  next_due        DateTime                    @db.Date
+  last_created_at DateTime?                   @db.Timestamptz
+  created_at      DateTime                    @default(now()) @db.Timestamptz
+  updated_at      DateTime                    @updatedAt @db.Timestamptz
+
+  task CoreTask @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@map("core_task_recurrence_configs")
+}
+
+model CoreTaskTemplate {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String           @db.Uuid
+  title                 String
+  description           String?          @db.Text
+  source_tag            CoreTaskSource   @default(manual)
+  default_priority      CoreTaskPriority @default(medium)
+  default_assignee_role String?
+  is_system             Boolean          @default(false)
+  created_by            String?          @db.Uuid
+  created_at            DateTime         @default(now()) @db.Timestamptz
+  updated_at            DateTime         @updatedAt @db.Timestamptz
+  deleted_at            DateTime?        @db.Timestamptz
+
+  @@index([tenant_id])
+  @@map("core_task_templates")
 }
