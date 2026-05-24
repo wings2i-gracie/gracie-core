@@ -167,3 +167,16 @@ export {
 } from './modules/ai/ai.service.js';
 
 export { default as coreAiRouter } from './modules/ai/ai.router.js';
+
+// ── E2.10: Help Assistant ─────────────────────────────────────────────────────
+
+export {
+  registerHelpProduct,
+  resolveArticle,
+  listArticles,
+  getArticle,
+  getHelpTooltips,
+  handleHelpChat,
+} from './modules/help/help.service.js';
+
+export { default as coreHelpRouter } from './modules/help/help.router.js';
