@@ -1,4 +1,4 @@
-// @wings2i-gracie/core — E2.1: Auth, Users, Middleware
+// @wings2i-gracie/core — E2.2: Permissions registry + RBAC middleware added
 
 export {
   generateAccessToken,
@@ -16,6 +16,19 @@ export {
   requireAuth,
   requireTenant,
 } from './middleware/auth.middleware.js';
+
+export {
+  requireRole,
+  checkModuleAccess,
+  checkModuleEdit,
+} from './middleware/rbac.middleware.js';
+
+export {
+  registerModules,
+  upsertModuleRegistry,
+  isModuleRegistered,
+  getRegisteredModuleKeys,
+} from './modules/permissions/permissions.service.js';
 
 export {
   getUsers,

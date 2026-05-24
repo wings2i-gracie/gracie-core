@@ -49,6 +49,20 @@ model CoreTenant {
   @@map("core_tenants")
 }
 
+model CoreModuleRegistry {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_key String   @db.VarChar(50)
+  module_key  String   @db.VarChar(100)
+  label       String?  @db.VarChar(200)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+
+  @@unique([product_key, module_key])
+  @@index([product_key])
+  @@map("core_module_registry")
+}
+
 model CoreUser {
   id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id            String?   @db.Uuid
