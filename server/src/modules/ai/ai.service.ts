@@ -200,7 +200,7 @@ export async function saveAiConfig(
     },
   });
 
-  // Strangler bridge: mirror to legacy tenant_settings.ai_config JSONB
+  // Strangler bridge: mirror to legacy tenant_settings.ai_config JSONB (fire-and-forget)
   const legacyStored = JSON.stringify({
     provider: data.provider,
     model: data.model,
@@ -214,11 +214,10 @@ export async function saveAiConfig(
     configuredAt: new Date().toISOString(),
     configuredBy: userId,
   });
-  await prisma.$executeRaw`
-    INSERT INTO tenant_settings (tenant_id, ai_config)
-    VALUES (${tenantId}::uuid, ${legacyStored}::jsonb)
-    ON CONFLICT (tenant_id) DO UPDATE SET ai_config = EXCLUDED.ai_config
-  `;
+  prisma.$executeRaw`
+    UPDATE tenant_settings SET ai_config = ${legacyStored}::jsonb
+    WHERE tenant_id = ${tenantId}::uuid
+  `.catch(() => {});
 
   return {
     provider: data.provider as CoreAiConfig['provider'],
@@ -238,10 +237,10 @@ export async function removeAiConfig(tenantId: string): Promise<void> {
   // Delete from Core table (ignore if not found)
   await prisma.coreAiTenantConfig.deleteMany({ where: { tenant_id: tenantId } });
 
-  // Mirror: clear legacy tenant_settings.ai_config
-  await prisma.$executeRaw`
+  // Mirror: clear legacy tenant_settings.ai_config (fire-and-forget)
+  prisma.$executeRaw`
     UPDATE tenant_settings SET ai_config = NULL WHERE tenant_id = ${tenantId}::uuid
-  `;
+  `.catch(() => {});
 }
 
 export async function resolveAiCredentials(tenantId: string): Promise<{
