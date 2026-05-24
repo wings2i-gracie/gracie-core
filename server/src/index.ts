@@ -110,3 +110,19 @@ export {
 } from './modules/tasks/tasks.service.js';
 
 export { default as coreTasksRouter } from './modules/tasks/tasks.router.js';
+
+// ── E2.7: Notifications ───────────────────────────────────────────────────────
+
+export {
+  createNotification,
+  notificationDispatch,
+  getUnreadCount,
+  listNotifications,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  type CreateNotificationParams,
+  type ListNotificationsFilter,
+} from './modules/notifications/notifications.service.js';
+
+export { default as coreNotificationsRouter } from './modules/notifications/notifications.router.js';

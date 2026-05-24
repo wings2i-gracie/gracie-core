@@ -94,9 +94,10 @@ model CoreTenant {
   archived_at       DateTime?    @db.Timestamptz
   archived_by       String?      @db.Uuid
 
-  users     CoreUser[]
-  auditLogs CoreAuditLog[]
-  tasks     CoreTask[]
+  users         CoreUser[]
+  auditLogs     CoreAuditLog[]
+  tasks         CoreTask[]
+  notifications CoreNotification[]
 
   @@map("core_tenants")
 }
@@ -134,12 +135,13 @@ model CoreUser {
   updated_at           DateTime  @updatedAt @db.Timestamptz
   deleted_at           DateTime? @db.Timestamptz
 
-  tenant           CoreTenant?       @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant           CoreTenant?           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   auditLogs        CoreAuditLog[]
-  headedFunctions  CoreFunction[]    @relation("CoreFunctionHead")
-  ownedTasks       CoreTask[]        @relation("CoreTaskOwner")
-  createdTasks     CoreTask[]        @relation("CoreTaskCreator")
-  watchedTasks     CoreTaskWatcher[] @relation("CoreTaskWatcher")
+  headedFunctions  CoreFunction[]        @relation("CoreFunctionHead")
+  ownedTasks       CoreTask[]            @relation("CoreTaskOwner")
+  createdTasks     CoreTask[]            @relation("CoreTaskCreator")
+  watchedTasks     CoreTaskWatcher[]     @relation("CoreTaskWatcher")
+  notifications    CoreNotification[]    @relation("CoreNotificationUser")
 
   @@map("core_users")
 }
@@ -414,4 +416,32 @@ model CoreTaskTemplate {
 
   @@index([tenant_id])
   @@map("core_task_templates")
+}
+
+// ─── E2.7: Notification Model ─────────────────────────────────────────────────
+// core_notifications is created by E2.7 migration.
+// Old Privacy notifications table is retained (strangler bridge — no drops).
+
+model CoreNotification {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  organisation_id String    @db.Uuid
+  user_id         String    @db.Uuid
+  event_type      String
+  title           String
+  body            String
+  record_ref      String?
+  record_module   String?
+  is_read         Boolean   @default(false)
+  read_at         DateTime? @db.Timestamptz
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+
+  tenant CoreTenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user   CoreUser   @relation("CoreNotificationUser", fields: [user_id], references: [id])
+
+  @@index([tenant_id])
+  @@index([tenant_id, user_id])
+  @@index([user_id])
+  @@map("core_notifications")
 }
