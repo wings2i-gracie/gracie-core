@@ -150,3 +150,20 @@ export {
 } from './modules/regulation/regulation.service.js';
 
 export { default as coreRegulationsRouter } from './modules/regulation/regulation.router.js';
+
+// ── E2.9: AI Configuration + Usage Logging ───────────────────────────────────
+
+export {
+  getAiConfig,
+  saveAiConfig,
+  removeAiConfig,
+  resolveAiCredentials,
+  getAiConfigStatusForAdmin,
+  logAiUsage,
+  estimateCost,
+  aiComplete,
+  type AiConfigSaveInput,
+  type LogAiUsageParams,
+} from './modules/ai/ai.service.js';
+
+export { default as coreAiRouter } from './modules/ai/ai.router.js';

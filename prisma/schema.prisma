@@ -98,6 +98,7 @@ model CoreTenant {
   auditLogs     CoreAuditLog[]
   tasks         CoreTask[]
   notifications CoreNotification[]
+  aiUsageLogs   CoreAiUsageLog[]
 
   @@map("core_tenants")
 }
@@ -142,6 +143,7 @@ model CoreUser {
   createdTasks     CoreTask[]            @relation("CoreTaskCreator")
   watchedTasks     CoreTaskWatcher[]     @relation("CoreTaskWatcher")
   notifications    CoreNotification[]    @relation("CoreNotificationUser")
+  aiUsageLogs      CoreAiUsageLog[]
 
   @@map("core_users")
 }
@@ -521,4 +523,65 @@ model CoreTenantRegulationToggle {
 
   @@unique([tenant_id, regulation_id])
   @@map("core_tenant_regulation_toggles")
+}
+
+// ─── E2.9: AI Configuration + Usage Logging ──────────────────────────────────
+
+enum CoreAiProvider {
+  openai
+  anthropic
+  azure_openai
+  gemini
+  local_llm
+
+  @@map("core_ai_provider")
+}
+
+model CoreAiTenantConfig {
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String         @unique @db.Uuid
+  provider              CoreAiProvider
+  api_key               String         @db.VarChar(2000)
+  iv                    String         @db.VarChar(100)
+  model                 String         @db.VarChar(200)
+  azure_endpoint        String?        @db.VarChar(500)
+  azure_deployment_name String?        @db.VarChar(200)
+  local_llm_base_url    String?        @db.VarChar(500)
+  local_llm_model_name  String?        @db.VarChar(200)
+  local_llm_api_key_req Boolean        @default(false)
+  spend_cap_usd         Decimal?       @db.Decimal(10, 2)
+  is_active             Boolean        @default(true)
+  configured_at         DateTime       @default(now()) @db.Timestamptz
+  configured_by         String?        @db.Uuid
+  created_at            DateTime       @default(now()) @db.Timestamptz
+  updated_at            DateTime       @updatedAt @db.Timestamptz
+
+  @@map("core_ai_tenant_config")
+}
+
+model CoreAiUsageLog {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String?   @db.Uuid
+  user_id            String?   @db.Uuid
+  scope              String    @default("tenant")
+  feature            String
+  provider           String
+  model              String
+  input_tokens       Int?
+  output_tokens      Int?
+  total_tokens       Int?
+  estimated_cost_usd Decimal?  @db.Decimal(10, 6)
+  latency_ms         Int?
+  status             String    @default("success")
+  error_code         String?
+  request_id         String?
+  created_at         DateTime  @default(now()) @db.Timestamptz
+
+  tenant CoreTenant? @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user   CoreUser?   @relation(fields: [user_id], references: [id])
+
+  @@index([tenant_id, created_at])
+  @@index([scope, created_at])
+  @@index([feature, created_at])
+  @@map("core_ai_usage_logs")
 }
