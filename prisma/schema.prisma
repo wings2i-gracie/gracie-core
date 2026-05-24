@@ -44,7 +44,8 @@ model CoreTenant {
   archived_at       DateTime?    @db.Timestamptz
   archived_by       String?      @db.Uuid
 
-  users CoreUser[]
+  users     CoreUser[]
+  auditLogs CoreAuditLog[]
 
   @@map("core_tenants")
 }
@@ -82,7 +83,36 @@ model CoreUser {
   updated_at           DateTime  @updatedAt @db.Timestamptz
   deleted_at           DateTime? @db.Timestamptz
 
-  tenant CoreTenant? @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant    CoreTenant?    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  auditLogs CoreAuditLog[]
 
   @@map("core_users")
+}
+
+// ─── Model: CoreAuditLog ─────────────────────────────────────────────────────
+// tenant_id nullable — NULL for super_admin cross-tenant actions.
+// organisation_id stored as plain UUID (organisations table is Privacy-specific).
+
+model CoreAuditLog {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String?   @db.Uuid
+  organisation_id String?   @db.Uuid
+  user_id         String    @db.Uuid
+  action          String
+  module          String
+  record_id       String?
+  record_type     String?
+  before_state    Json?
+  after_state     Json?
+  ip_address      String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+
+  user   CoreUser    @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  tenant CoreTenant? @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([tenant_id, created_at(sort: Desc)])
+  @@index([user_id])
+  @@index([module])
+  @@map("core_audit_log")
 }

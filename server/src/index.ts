@@ -1,4 +1,4 @@
-// @wings2i-gracie/core — E2.2: Permissions registry + RBAC middleware added
+// @wings2i-gracie/core — E2.3: Audit log service + router extracted from Privacy
 
 export {
   generateAccessToken,
@@ -37,3 +37,12 @@ export {
   deactivateUser,
   resetPassword,
 } from './modules/users/users.service.js';
+
+export {
+  auditLog,
+  getAuditLogs,
+  exportAuditLogsAsCsv,
+  type AuditLogParams,
+} from './modules/audit/audit.service.js';
+
+export { default as coreAuditRouter } from './modules/audit/audit.router.js';
