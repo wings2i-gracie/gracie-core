@@ -26,7 +26,7 @@ PrismaClient MUST be constructed with PrismaPg adapter (Prisma 7 client engine
 requires driver adapter for custom output paths):
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
   const prisma = new PrismaClient({ adapter });
-Models: CoreTenant (@@map "core_tenants"), CoreUser (@@map "core_users").
+Models: CoreTenant (@@map "core_tenants"), CoreUser (@@map "core_users"), CoreFile (@@map "core_files").
 
 ## Build
 npm run build     → tsc compiles to dist/
@@ -58,3 +58,12 @@ E2.1 (2026-05-25) — CoreTenant/CoreUser models + auth/users extraction.
   server/src/index.ts: exports all above.
   Added @prisma/adapter-pg + pg deps (Prisma 7 driver adapter requirement).
   v0.2.0-alpha.1 tagged + published. Commits: f1e6a8b, 8fc6e57.
+E2.4 (2026-05-26) — File Storage abstraction.
+  prisma/schema.prisma: CoreFile (@@map core_files) — tenant_id, module_key, original_name,
+  file_path, mime_type, size_bytes, uploaded_by (plain UUID, no FK), soft delete.
+  Migration: 20260526000003_e2_4_core_files.
+  server/src/modules/storage/LocalStorageProvider.ts: implements StorageProvider interface
+  from contracts. Base: process.cwd()/uploads. Path: /uploads/{tenantId}/{moduleKey}/{uuid}-{name}.
+  server/src/modules/storage/storage.service.ts: uploadFile, getFile, deleteFile,
+  getFilesByModule — all tenant-scoped. uploadFile uses same fileId for DB PK and filename prefix.
+  index.ts: exports all four service functions + LocalStorageProvider.

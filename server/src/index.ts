@@ -46,3 +46,12 @@ export {
 } from './modules/audit/audit.service.js';
 
 export { default as coreAuditRouter } from './modules/audit/audit.router.js';
+
+export {
+  uploadFile,
+  getFile,
+  deleteFile,
+  getFilesByModule,
+} from './modules/storage/storage.service.js';
+
+export { LocalStorageProvider } from './modules/storage/LocalStorageProvider.js';

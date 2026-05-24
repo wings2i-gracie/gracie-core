@@ -116,3 +116,26 @@ model CoreAuditLog {
   @@index([module])
   @@map("core_audit_log")
 }
+
+// ─── Model: CoreFile ─────────────────────────────────────────────────────────
+// Metadata for files managed via Core's file storage service.
+// uploaded_by is a plain UUID (not a FK relation) — user table is core_users
+// but the FK is omitted so Core stays decoupled from Privacy user lifecycle.
+
+model CoreFile {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  module_key    String    @db.VarChar(100)
+  original_name String    @db.VarChar(500)
+  file_path     String    @db.VarChar(1000)
+  mime_type     String    @db.VarChar(200)
+  size_bytes    Int
+  uploaded_by   String    @db.Uuid
+  created_at    DateTime  @default(now()) @db.Timestamptz
+  deleted_at    DateTime? @db.Timestamptz
+
+  @@index([tenant_id])
+  @@index([module_key])
+  @@index([uploaded_by])
+  @@map("core_files")
+}
