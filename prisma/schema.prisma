@@ -99,6 +99,7 @@ model CoreTenant {
   tasks         CoreTask[]
   notifications CoreNotification[]
   aiUsageLogs   CoreAiUsageLog[]
+  searchIndex   CoreSearchIndex[]  @relation("CoreSearchIndexTenant")
 
   @@map("core_tenants")
 }
@@ -584,4 +585,29 @@ model CoreAiUsageLog {
   @@index([scope, created_at])
   @@index([feature, created_at])
   @@map("core_ai_usage_logs")
+}
+
+// ─── E2.11: Global Search ────────────────────────────────────────────────────
+// core_search_index is created by migration 20260524000004.
+// Old Privacy search_index table is retained (strangler bridge — no drops).
+
+model CoreSearchIndex {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  module_key String    @db.VarChar(100)
+  record_id  String    @db.Uuid
+  title      String    @db.VarChar(500)
+  body       String?   @db.Text
+  url        String?   @db.VarChar(500)
+  tags       String[]
+  created_at DateTime  @default(now()) @db.Timestamptz
+  updated_at DateTime  @updatedAt @db.Timestamptz
+  deleted_at DateTime? @db.Timestamptz
+
+  tenant CoreTenant @relation("CoreSearchIndexTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, module_key, record_id])
+  @@index([tenant_id])
+  @@index([module_key])
+  @@map("core_search_index")
 }

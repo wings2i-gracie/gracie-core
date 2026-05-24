@@ -180,3 +180,16 @@ export {
 } from './modules/help/help.service.js';
 
 export { default as coreHelpRouter } from './modules/help/help.router.js';
+
+// ── E2.11: Global Search ──────────────────────────────────────────────────────
+
+export {
+  upsertSearchIndex,
+  deleteSearchIndex,
+  searchRecords,
+  reindexModule,
+  type SearchIndexEntry,
+  type SearchResult,
+} from './modules/search/search.service.js';
+
+export { default as coreSearchRouter } from './modules/search/search.router.js';
