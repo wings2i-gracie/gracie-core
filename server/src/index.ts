@@ -138,6 +138,13 @@ export {
   getEnabledRegulationsForTenant,
   listRegulationsWithToggles,
   toggleRegulation,
+  createRegulation as coreCreateRegulation,
+  updateRegulation as coreUpdateRegulation,
+  publishRegulation as corePublishRegulation,
+  deprecateRegulation as coreDeprecateRegulation,
+  deleteRegulation as coreDeleteRegulation,
+  listDocumentsForTenant as coreListDocumentsForTenant,
+  listDocumentsForRegulation as coreListDocumentsForRegulation,
   type CoreRegulationSummary,
   type CoreRegulationWithToggle,
 } from './modules/regulation/regulation.service.js';

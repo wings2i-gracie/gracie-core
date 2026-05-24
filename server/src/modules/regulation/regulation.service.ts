@@ -263,6 +263,217 @@ export async function listRegulationsWithToggles(
   }));
 }
 
+// ── Write path (E2.8b) ───────────────────────────────────────────────────────
+
+export async function createRegulation(data: {
+  code: string;
+  name: string;
+  shortName?: string;
+  jurisdiction?: string;
+  authority?: string;
+  effectiveDate?: string;
+  description?: string;
+  terminology?: Record<string, string>;
+  legalBasisOptions?: Array<{ key: string; label: string; description: string }>;
+  countryCodes?: string[];
+}) {
+  if (!data.code || !data.name) {
+    throw Object.assign(new Error('code and name are required'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  }
+  const code = data.code.toUpperCase();
+  const existing = await prisma.coreRegulation.findUnique({ where: { code } });
+  if (existing) {
+    throw Object.assign(new Error(`Regulation code ${code} already exists`), { statusCode: 409, code: 'DUPLICATE_CODE' });
+  }
+
+  const terminologyJson = data.terminology ? JSON.stringify(data.terminology) : null;
+  const lboJson = data.legalBasisOptions ? JSON.stringify(data.legalBasisOptions) : null;
+  const ccJson = data.countryCodes ? JSON.stringify(data.countryCodes) : null;
+
+  const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+    INSERT INTO core_regulations (
+      code, name, short_name, jurisdiction, authority, effective_date,
+      description, status, terminology, legal_basis_options, country_codes,
+      is_active, created_at, updated_at
+    ) VALUES (
+      ${code}, ${data.name}, ${data.shortName ?? null},
+      ${data.jurisdiction ?? ''}, ${data.authority ?? null},
+      ${data.effectiveDate ? new Date(data.effectiveDate) : null},
+      ${data.description ?? null}, 'draft',
+      ${terminologyJson}::jsonb, ${lboJson}::jsonb, ${ccJson}::jsonb,
+      false, now(), now()
+    ) RETURNING *
+  `;
+
+  // Mirror to legacy regulations table (strangler bridge)
+  await prisma.$executeRaw`
+    INSERT INTO regulations (
+      code, name, short_name, jurisdiction, authority, effective_date,
+      description, status, terminology, legal_basis_options, country_codes,
+      is_active, created_at, updated_at
+    ) VALUES (
+      ${code}, ${data.name}, ${data.shortName ?? null},
+      ${data.jurisdiction ?? ''}, ${data.authority ?? null},
+      ${data.effectiveDate ? new Date(data.effectiveDate) : null},
+      ${data.description ?? null}, 'draft',
+      ${terminologyJson}::jsonb, ${lboJson}::jsonb, ${ccJson}::jsonb,
+      false, now(), now()
+    ) ON CONFLICT (code) DO NOTHING
+  `;
+
+  return rows[0];
+}
+
+export async function updateRegulation(id: string, data: Record<string, unknown>) {
+  const reg = await prisma.coreRegulation.findUnique({ where: { id } });
+  if (!reg) throw Object.assign(new Error('Regulation not found'), { statusCode: 404, code: 'NOT_FOUND' });
+
+  const coreSets: string[] = ['updated_at = now()'];
+  const coreVals: unknown[] = [id];
+  let idx = 2;
+
+  if (data.name !== undefined) { coreSets.push(`name = $${idx++}`); coreVals.push(data.name); }
+  if (data.shortName !== undefined) { coreSets.push(`short_name = $${idx++}`); coreVals.push(data.shortName); }
+  if (data.jurisdiction !== undefined) { coreSets.push(`jurisdiction = $${idx++}`); coreVals.push(data.jurisdiction); }
+  if (data.authority !== undefined) { coreSets.push(`authority = $${idx++}`); coreVals.push(data.authority ?? null); }
+  if ('effectiveDate' in data) { coreSets.push(`effective_date = $${idx++}`); coreVals.push(data.effectiveDate ? new Date(data.effectiveDate as string) : null); }
+  if (data.description !== undefined) { coreSets.push(`description = $${idx++}`); coreVals.push(data.description); }
+  if (data.status !== undefined) { coreSets.push(`status = $${idx++}`); coreVals.push(data.status); }
+  if (data.changelog !== undefined) { coreSets.push(`changelog = $${idx++}`); coreVals.push(data.changelog); }
+  if (data.terminology !== undefined) { coreSets.push(`terminology = $${idx++}::jsonb`); coreVals.push(JSON.stringify(data.terminology)); }
+  if (data.legalBasisOptions !== undefined) { coreSets.push(`legal_basis_options = $${idx++}::jsonb`); coreVals.push(JSON.stringify(data.legalBasisOptions)); }
+  if (data.countryCodes !== undefined) { coreSets.push(`country_codes = $${idx++}::jsonb`); coreVals.push(JSON.stringify(data.countryCodes)); }
+
+  if (coreSets.length > 1) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE core_regulations SET ${coreSets.join(', ')} WHERE id = $1::uuid`,
+      ...coreVals,
+    );
+  }
+
+  // Mirror to legacy regulations table (find by code, same fields)
+  const legSets: string[] = ['updated_at = now()'];
+  const legVals: unknown[] = [reg.code];
+  let li = 2;
+
+  if (data.name !== undefined) { legSets.push(`name = $${li++}`); legVals.push(data.name); }
+  if (data.shortName !== undefined) { legSets.push(`short_name = $${li++}`); legVals.push(data.shortName); }
+  if (data.jurisdiction !== undefined) { legSets.push(`jurisdiction = $${li++}`); legVals.push(data.jurisdiction); }
+  if (data.authority !== undefined) { legSets.push(`authority = $${li++}`); legVals.push(data.authority ?? null); }
+  if ('effectiveDate' in data) { legSets.push(`effective_date = $${li++}`); legVals.push(data.effectiveDate ? new Date(data.effectiveDate as string) : null); }
+  if (data.description !== undefined) { legSets.push(`description = $${li++}`); legVals.push(data.description); }
+  if (data.status !== undefined) { legSets.push(`status = $${li++}`); legVals.push(data.status); }
+  if (data.changelog !== undefined) { legSets.push(`changelog = $${li++}`); legVals.push(data.changelog); }
+  if (data.terminology !== undefined) { legSets.push(`terminology = $${li++}::jsonb`); legVals.push(JSON.stringify(data.terminology)); }
+  if (data.legalBasisOptions !== undefined) { legSets.push(`legal_basis_options = $${li++}::jsonb`); legVals.push(JSON.stringify(data.legalBasisOptions)); }
+  if (data.countryCodes !== undefined) { legSets.push(`country_codes = $${li++}::jsonb`); legVals.push(JSON.stringify(data.countryCodes)); }
+
+  if (legSets.length > 1) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE regulations SET ${legSets.join(', ')} WHERE code = $1`,
+      ...legVals,
+    );
+  }
+
+  return prisma.coreRegulation.findUniqueOrThrow({ where: { id } });
+}
+
+export async function publishRegulation(id: string, changelog?: string) {
+  const reg = await prisma.coreRegulation.findUnique({ where: { id } });
+  if (!reg) throw Object.assign(new Error('Regulation not found'), { statusCode: 404, code: 'NOT_FOUND' });
+
+  const changelogVal = changelog ?? null;
+  await prisma.$executeRaw`
+    UPDATE core_regulations
+    SET status = 'published', is_active = true, changelog = ${changelogVal}, updated_at = now()
+    WHERE id = ${id}::uuid
+  `;
+  // Mirror to legacy
+  await prisma.$executeRaw`
+    UPDATE regulations
+    SET status = 'published', is_active = true, changelog = ${changelogVal}, updated_at = now()
+    WHERE code = ${reg.code}
+  `;
+  return prisma.coreRegulation.findUniqueOrThrow({ where: { id } });
+}
+
+export async function deprecateRegulation(id: string) {
+  const reg = await prisma.coreRegulation.findUnique({ where: { id } });
+  if (!reg) throw Object.assign(new Error('Regulation not found'), { statusCode: 404, code: 'NOT_FOUND' });
+
+  await prisma.$executeRaw`
+    UPDATE core_regulations SET status = 'deprecated', is_active = false, updated_at = now()
+    WHERE id = ${id}::uuid
+  `;
+  // Mirror to legacy
+  await prisma.$executeRaw`
+    UPDATE regulations SET status = 'deprecated', is_active = false, updated_at = now()
+    WHERE code = ${reg.code}
+  `;
+  return prisma.coreRegulation.findUniqueOrThrow({ where: { id } });
+}
+
+export async function deleteRegulation(id: string): Promise<void> {
+  const reg = await prisma.coreRegulation.findUnique({ where: { id } });
+  if (!reg) throw Object.assign(new Error('Regulation not found'), { statusCode: 404, code: 'NOT_FOUND' });
+
+  const inUse = await prisma.$queryRaw<{ cnt: bigint }[]>`
+    SELECT COUNT(*) AS cnt FROM core_tenant_regulation_toggles
+    WHERE regulation_id = ${id}::uuid AND is_enabled = true
+  `;
+  if (Number(inUse[0]?.cnt ?? 0) > 0) {
+    throw Object.assign(
+      new Error('Regulation is enabled for one or more tenants — disable before deleting'),
+      { statusCode: 400, code: 'REGULATION_IN_USE' },
+    );
+  }
+
+  // Remove Core dependent rows then the regulation itself
+  await prisma.$executeRaw`DELETE FROM core_tenant_regulation_toggles WHERE regulation_id = ${id}::uuid`;
+  await prisma.$executeRaw`DELETE FROM core_regulation_documents WHERE regulation_id = ${id}::uuid`;
+  await prisma.$executeRaw`DELETE FROM core_regulations WHERE id = ${id}::uuid`;
+
+  // Mirror: remove from legacy regulations table (relies on DB-level CASCADE for legacy child rows)
+  await prisma.$executeRaw`DELETE FROM regulations WHERE code = ${reg.code}`;
+}
+
+// ── Tenant-facing document reads (E2.8b) ─────────────────────────────────────
+
+export async function listDocumentsForTenant(tenantId: string) {
+  const toggles = await prisma.coreTenantRegulationToggle.findMany({
+    where: { tenant_id: tenantId, is_enabled: true },
+    select: { regulation_id: true },
+  });
+  if (toggles.length === 0) return [];
+
+  const regulationIds = toggles.map((t) => t.regulation_id);
+  const docs = await prisma.coreRegulationDocument.findMany({
+    where: { regulation_id: { in: regulationIds }, deleted_at: null, is_visible: true },
+    include: { regulation: { select: { code: true, name: true } } },
+    orderBy: [{ regulation: { code: 'asc' } }, { sort_order: 'asc' }],
+  });
+
+  return docs.map((d) => ({
+    ...mapDocument(d),
+    regCode: d.regulation.code,
+    regName: d.regulation.name,
+  }));
+}
+
+export async function listDocumentsForRegulation(regulationId: string, tenantId: string) {
+  const toggle = await prisma.coreTenantRegulationToggle.findFirst({
+    where: { regulation_id: regulationId, tenant_id: tenantId, is_enabled: true },
+  });
+  if (!toggle) {
+    throw Object.assign(new Error('Regulation not enabled for your organisation'), { statusCode: 403, code: 'FORBIDDEN' });
+  }
+  const docs = await prisma.coreRegulationDocument.findMany({
+    where: { regulation_id: regulationId, deleted_at: null, is_visible: true },
+    orderBy: { sort_order: 'asc' },
+  });
+  return docs.map(mapDocument);
+}
+
 export async function toggleRegulation(
   tenantId: string,
   regulationId: string,
