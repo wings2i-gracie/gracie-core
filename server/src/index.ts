@@ -126,3 +126,20 @@ export {
 } from './modules/notifications/notifications.service.js';
 
 export { default as coreNotificationsRouter } from './modules/notifications/notifications.router.js';
+
+// ── E2.8a: Regulation Library ─────────────────────────────────────────────────
+
+export {
+  listRegulations,
+  getRegulation,
+  listRequirements,
+  listPrinciples,
+  listDocuments,
+  getEnabledRegulationsForTenant,
+  listRegulationsWithToggles,
+  toggleRegulation,
+  type CoreRegulationSummary,
+  type CoreRegulationWithToggle,
+} from './modules/regulation/regulation.service.js';
+
+export { default as coreRegulationsRouter } from './modules/regulation/regulation.router.js';

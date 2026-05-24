@@ -12,7 +12,8 @@
     "prisma:generate": "prisma generate",
     "build": "npm run prisma:generate && tsc && node -e \"require('fs').cpSync('server/src/generated/prisma-client', 'dist/server/src/generated/prisma-client', {recursive:true})\"",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "seed:regulations": "npx tsx prisma/seed-regulations.ts"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

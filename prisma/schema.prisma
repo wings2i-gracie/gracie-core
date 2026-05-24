@@ -445,3 +445,80 @@ model CoreNotification {
   @@index([user_id])
   @@map("core_notifications")
 }
+
+// ── E2.8a: Regulation Library ────────────────────────────────────────────────
+
+model CoreRegulation {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                String    @unique
+  name                String
+  short_name          String?
+  jurisdiction        String
+  authority           String?
+  effective_date      DateTime? @db.Date
+  description         String?
+  status              String    @default("published")
+  terminology         Json?
+  legal_basis_options Json?
+  country_codes       Json?
+  changelog           String?
+  is_active           Boolean   @default(false)
+  created_at          DateTime  @default(now()) @db.Timestamptz
+  updated_at          DateTime  @updatedAt @db.Timestamptz
+
+  documents CoreRegulationDocument[]
+  toggles   CoreTenantRegulationToggle[]
+
+  @@map("core_regulations")
+}
+
+model CorePrivacyPrinciple {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String @unique
+  name        String
+  description String
+  sort_order  Int
+
+  @@map("core_privacy_principles")
+}
+
+model CoreRegulationDocument {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  regulation_id     String    @db.Uuid
+  title             String
+  doc_type          String
+  source_type       String
+  file_ref          String?
+  external_url      String?
+  issuing_authority String?
+  version           String?
+  effective_date    DateTime? @db.Date
+  description       String?
+  file_size_bytes   Int?
+  page_count        Int?
+  is_visible        Boolean   @default(true)
+  sort_order        Int       @default(0)
+  created_by        String    @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamptz
+  updated_at        DateTime  @updatedAt @db.Timestamptz
+  deleted_at        DateTime? @db.Timestamptz
+
+  regulation CoreRegulation @relation(fields: [regulation_id], references: [id])
+
+  @@map("core_regulation_documents")
+}
+
+model CoreTenantRegulationToggle {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id           String   @db.Uuid
+  regulation_id       String   @db.Uuid
+  is_enabled          Boolean  @default(false)
+  jurisdiction_detail String?
+  updated_by          String   @db.Uuid
+  updated_at          DateTime @updatedAt @db.Timestamptz
+
+  regulation CoreRegulation @relation(fields: [regulation_id], references: [id])
+
+  @@unique([tenant_id, regulation_id])
+  @@map("core_tenant_regulation_toggles")
+}
