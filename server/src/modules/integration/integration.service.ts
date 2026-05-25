@@ -1,11 +1,13 @@
 // E2.15a: Integration framework — API key management + webhook engine.
 // API keys: generate/list/revoke/validate with bcrypt hashing (prefix lookup, never store plaintext).
 // Webhooks: in-memory event registry, subscription CRUD, HMAC-signed HTTP delivery with retry.
+// E2.15b: dispatchWebhook also publishes to the in-process event bus so internal handlers fire too.
 
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import prisma from '../../lib/prisma.js';
 import type { WebhookEventDefinition } from '@wings2i-gracie/contracts';
+import { eventBus } from './eventBus.js';
 
 // ─── In-memory webhook event registry ────────────────────────────────────────
 
@@ -172,6 +174,9 @@ export async function dispatchWebhook(
     // Fire-and-forget delivery; errors are logged, not propagated to caller
     void deliverWebhook(sub.id, delivery.id, sub.target_url, sub.secret, eventKey, payload);
   }
+
+  // Also publish to in-process event bus so internal handlers fire for the same event
+  void eventBus.publish(eventKey, payload);
 }
 
 async function deliverWebhook(

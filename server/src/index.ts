@@ -239,3 +239,27 @@ export {
 } from './modules/integration/integration.service.js';
 
 export { default as coreIntegrationsRouter } from './modules/integration/integration.router.js';
+
+// ── E2.15b: OAuth, Event Bus, Rate Limiting, Idempotency, OpenAPI, Audit ──────
+
+export {
+  createOAuthClient,
+  listOAuthClients,
+  revokeOAuthClient,
+  issueClientCredentialsToken,
+  validateOAuthToken,
+} from './modules/integration/oauth.service.js';
+
+export { eventBus } from './modules/integration/eventBus.js';
+
+export { rateLimitByApiKey, rateLimitByOAuthClient } from './modules/integration/rateLimiter.middleware.js';
+
+export { requireIdempotency } from './modules/integration/idempotency.middleware.js';
+
+export { registerOpenApiFragment, getComposedSpec } from './modules/integration/openapi.service.js';
+
+export {
+  logIntegrationRequest,
+  getIntegrationAudit,
+  type AuditFilters,
+} from './modules/integration/integrationAudit.service.js';

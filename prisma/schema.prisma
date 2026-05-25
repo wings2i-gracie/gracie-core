@@ -105,6 +105,8 @@ model CoreTenant {
   apiKeys              CoreApiKey[]               @relation("CoreApiKeyTenant")
   webhookSubscriptions CoreWebhookSubscription[]  @relation("CoreWebhookSubscriptionTenant")
   webhookDeliveries    CoreWebhookDelivery[]      @relation("CoreWebhookDeliveryTenant")
+  oauthClients         CoreOAuthClient[]          @relation("CoreOAuthClientTenant")
+  oauthTokens          CoreOAuthToken[]           @relation("CoreOAuthTokenTenant")
 
   @@map("core_tenants")
 }
@@ -754,4 +756,63 @@ model CoreWebhookDelivery {
   @@index([subscription_id])
   @@index([status, next_retry_at])
   @@map("core_webhook_deliveries")
+}
+
+// ─── E2.15b: OAuth Clients + Tokens + Integration Audit ─────────────────────
+
+model CoreOAuthClient {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  client_id          String    @unique @db.VarChar(80)
+  client_secret_hash String    @db.VarChar(100)
+  name               String    @db.VarChar(200)
+  scopes             String[]
+  grant_types        String[]
+  revoked_at         DateTime? @db.Timestamptz
+  created_at         DateTime  @default(now()) @db.Timestamptz
+  updated_at         DateTime  @updatedAt @db.Timestamptz
+  deleted_at         DateTime? @db.Timestamptz
+
+  tenant CoreTenant       @relation("CoreOAuthClientTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+  tokens CoreOAuthToken[]
+
+  @@index([tenant_id])
+  @@map("core_oauth_clients")
+}
+
+model CoreOAuthToken {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  client_id         String    @db.Uuid
+  tenant_id         String    @db.Uuid
+  access_token_hash String    @db.VarChar(200)
+  scopes            String[]
+  expires_at        DateTime  @db.Timestamptz
+  revoked_at        DateTime? @db.Timestamptz
+  created_at        DateTime  @default(now()) @db.Timestamptz
+
+  client CoreOAuthClient @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  tenant CoreTenant      @relation("CoreOAuthTokenTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([client_id])
+  @@index([access_token_hash])
+  @@map("core_oauth_tokens")
+}
+
+model CoreIntegrationAudit {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String   @db.Uuid
+  actor_type    String   @db.VarChar(20)
+  actor_id      String   @db.VarChar(200)
+  action        String   @db.VarChar(200)
+  resource_type String?  @db.VarChar(100)
+  resource_id   String?  @db.VarChar(200)
+  status_code   Int?
+  ip_address    String?  @db.VarChar(100)
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  @@index([tenant_id])
+  @@index([tenant_id, created_at(sort: Desc)])
+  @@index([actor_type])
+  @@map("core_integration_audit")
 }
