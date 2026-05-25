@@ -4,3 +4,11 @@ dist/
 .env
 .claude/
 server/src/generated/
+server/src/**/*.js
+server/src/**/*.js.map
+server/src/**/*.d.ts
+server/src/**/*.d.ts.map
+client/src/**/*.js
+client/src/**/*.js.map
+client/src/**/*.d.ts
+client/src/**/*.d.ts.map

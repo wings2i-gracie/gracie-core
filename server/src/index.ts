@@ -193,3 +193,30 @@ export {
 } from './modules/search/search.service.js';
 
 export { default as coreSearchRouter } from './modules/search/search.router.js';
+
+// ── E2.14: Reporting Engine ───────────────────────────────────────────────────
+
+export {
+  registerReportTemplates,
+  getRegisteredTemplates,
+  listReportRuns,
+  getReportRun,
+  createReportRunRecord,
+  softDeleteReportRun,
+  shareReportRun,
+  createPendingReportRun,
+  finaliseReportRun,
+  getReportRunStatus,
+  listSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+  markScheduleRan,
+  getDueSchedules,
+  type CreateReportRunInput,
+  type CreateScheduleInput,
+  type ReportingRegistration,
+  type ReportingTemplateSpec,
+} from './modules/reporting/reporting.service.js';
+
+export { default as coreReportingRouter } from './modules/reporting/reporting.router.js';

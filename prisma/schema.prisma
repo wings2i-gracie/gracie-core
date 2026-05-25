@@ -98,8 +98,10 @@ model CoreTenant {
   auditLogs     CoreAuditLog[]
   tasks         CoreTask[]
   notifications CoreNotification[]
-  aiUsageLogs   CoreAiUsageLog[]
-  searchIndex   CoreSearchIndex[]  @relation("CoreSearchIndexTenant")
+  aiUsageLogs       CoreAiUsageLog[]
+  searchIndex       CoreSearchIndex[]       @relation("CoreSearchIndexTenant")
+  reportRuns        CoreReportRun[]         @relation("CoreReportRunTenant")
+  scheduledReports  CoreScheduledReport[]   @relation("CoreScheduledReportTenant")
 
   @@map("core_tenants")
 }
@@ -610,4 +612,78 @@ model CoreSearchIndex {
   @@index([tenant_id])
   @@index([module_key])
   @@map("core_search_index")
+}
+
+// ─── E2.14: Reporting Engine ─────────────────────────────────────────────────
+// core_report_templates created by migration 20260524000006.
+// core_report_runs and core_scheduled_reports created by same migration.
+// Old Privacy report_runs and report_schedules tables retained (strangler bridge).
+
+model CoreReportTemplate {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_key       String   @db.VarChar(100)
+  template_key      String   @db.VarChar(100)
+  name              String
+  description       String?
+  report_type_key   String   @db.VarChar(100)
+  supported_formats String[] @default(["pdf", "excel", "csv", "html"])
+  default_format    String   @default("pdf") @db.VarChar(20)
+  sort_order        Int      @default(0)
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now()) @db.Timestamptz
+  updated_at        DateTime @updatedAt @db.Timestamptz
+
+  @@unique([product_key, template_key])
+  @@index([product_key])
+  @@map("core_report_templates")
+}
+
+model CoreReportRun {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  template_key    String?   @db.VarChar(100)
+  report_type     String    @db.VarChar(100)
+  title           String
+  scope           Json      @default("{}") @db.JsonB
+  format          String    @db.VarChar(20)
+  generated_by    String    @db.Uuid
+  generated_at    DateTime  @default(now()) @db.Timestamptz
+  file_ref        String?
+  file_size_bytes Int?
+  shared_with     Json      @default("[]") @db.JsonB
+  status          String    @default("ready") @db.VarChar(20)
+  deleted_at      DateTime? @db.Timestamptz
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  tenant CoreTenant @relation("CoreReportRunTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, report_type])
+  @@index([tenant_id, generated_at])
+  @@map("core_report_runs")
+}
+
+model CoreScheduledReport {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String    @db.Uuid
+  template_key String?   @db.VarChar(100)
+  report_type  String    @db.VarChar(100)
+  title        String
+  scope        Json      @default("{}") @db.JsonB
+  format       String    @db.VarChar(20)
+  frequency    String    @db.VarChar(20)
+  next_run     DateTime  @db.Date
+  last_run_at  DateTime? @db.Timestamptz
+  recipients   Json      @default("[]") @db.JsonB
+  is_active    Boolean   @default(true)
+  created_by   String    @db.Uuid
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
+  deleted_at   DateTime? @db.Timestamptz
+
+  tenant CoreTenant @relation("CoreScheduledReportTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([next_run, is_active])
+  @@map("core_scheduled_reports")
 }
