@@ -303,3 +303,15 @@ export {
 } from './modules/regulatoryFeed/regulatoryFeed.service.js';
 
 export { default as coreRegulatoryFeedRouter } from './modules/regulatoryFeed/regulatoryFeed.router.js';
+
+// ── E2.18: App Shell Registry ─────────────────────────────────────────────────
+
+export {
+  registerProduct,
+  getProduct,
+  listProducts,
+  getSidebar,
+  getModules,
+} from './modules/shellRegistry/shellRegistry.service.js';
+
+export { default as shellRegistryRouter } from './modules/shellRegistry/shellRegistry.router.js';
