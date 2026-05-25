@@ -263,3 +263,24 @@ export {
   getIntegrationAudit,
   type AuditFilters,
 } from './modules/integration/integrationAudit.service.js';
+
+// ── E2.16: Tenant Management + License Management ─────────────────────────────
+
+export {
+  listTenants,
+  getTenant,
+  createTenant,
+  suspendTenant,
+  reactivateTenant,
+  archiveTenant,
+  assignLicense,
+  revokeLicense,
+  getLicenses,
+  issueSupportModeToken,
+  exitSupportMode,
+  type ListTenantsFilter,
+  type ListTenantsResult,
+  type SupportModeResult,
+} from './modules/tenantMgmt/tenantMgmt.service.js';
+
+export { default as coreSuperAdminRouter } from './modules/tenantMgmt/tenantMgmt.router.js';

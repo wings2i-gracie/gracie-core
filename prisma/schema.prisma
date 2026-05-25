@@ -107,6 +107,8 @@ model CoreTenant {
   webhookDeliveries    CoreWebhookDelivery[]      @relation("CoreWebhookDeliveryTenant")
   oauthClients         CoreOAuthClient[]          @relation("CoreOAuthClientTenant")
   oauthTokens          CoreOAuthToken[]           @relation("CoreOAuthTokenTenant")
+  licenses             CoreTenantLicense[]        @relation("CoreTenantLicenses")
+  supportModeSessions  CoreSupportModeSession[]   @relation("CoreSupportModeSessions")
 
   @@map("core_tenants")
 }
@@ -815,4 +817,49 @@ model CoreIntegrationAudit {
   @@index([tenant_id, created_at(sort: Desc)])
   @@index([actor_type])
   @@map("core_integration_audit")
+}
+
+// ─── E2.16: Tenant Licenses + Support Mode Sessions ──────────────────────────
+
+enum CoreLicenseTier {
+  core
+  professional
+  enterprise
+
+  @@map("core_license_tier")
+}
+
+model CoreTenantLicense {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String          @db.Uuid
+  product_key String          @db.VarChar(100)
+  tier        CoreLicenseTier @default(core)
+  valid_from  DateTime        @default(now()) @db.Timestamptz
+  valid_until DateTime?       @db.Timestamptz
+  assigned_by String          @db.Uuid
+  created_at  DateTime        @default(now()) @db.Timestamptz
+  updated_at  DateTime        @updatedAt @db.Timestamptz
+  deleted_at  DateTime?       @db.Timestamptz
+
+  tenant CoreTenant @relation("CoreTenantLicenses", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@map("core_tenant_licenses")
+}
+
+model CoreSupportModeSession {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  super_admin_user_id String    @db.Uuid
+  issued_at           DateTime  @default(now()) @db.Timestamptz
+  expires_at          DateTime  @db.Timestamptz
+  exited_at           DateTime? @db.Timestamptz
+  audit_note          String?   @db.Text
+  created_at          DateTime  @default(now()) @db.Timestamptz
+
+  tenant CoreTenant @relation("CoreSupportModeSessions", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([super_admin_user_id])
+  @@map("core_support_mode_sessions")
 }
