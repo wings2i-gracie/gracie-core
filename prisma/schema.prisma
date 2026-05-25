@@ -99,9 +99,12 @@ model CoreTenant {
   tasks         CoreTask[]
   notifications CoreNotification[]
   aiUsageLogs       CoreAiUsageLog[]
-  searchIndex       CoreSearchIndex[]       @relation("CoreSearchIndexTenant")
-  reportRuns        CoreReportRun[]         @relation("CoreReportRunTenant")
-  scheduledReports  CoreScheduledReport[]   @relation("CoreScheduledReportTenant")
+  searchIndex          CoreSearchIndex[]          @relation("CoreSearchIndexTenant")
+  reportRuns           CoreReportRun[]            @relation("CoreReportRunTenant")
+  scheduledReports     CoreScheduledReport[]      @relation("CoreScheduledReportTenant")
+  apiKeys              CoreApiKey[]               @relation("CoreApiKeyTenant")
+  webhookSubscriptions CoreWebhookSubscription[]  @relation("CoreWebhookSubscriptionTenant")
+  webhookDeliveries    CoreWebhookDelivery[]      @relation("CoreWebhookDeliveryTenant")
 
   @@map("core_tenants")
 }
@@ -686,4 +689,69 @@ model CoreScheduledReport {
   @@index([tenant_id])
   @@index([next_run, is_active])
   @@map("core_scheduled_reports")
+}
+
+// ─── E2.15a: API Keys + Webhooks ─────────────────────────────────────────────
+
+model CoreApiKey {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String    @db.Uuid
+  name         String    @db.VarChar(200)
+  key_prefix   String    @db.VarChar(10)
+  key_hash     String    @db.VarChar(100)
+  scopes       String[]
+  last_used_at DateTime? @db.Timestamptz
+  expires_at   DateTime? @db.Timestamptz
+  revoked_at   DateTime? @db.Timestamptz
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
+
+  tenant CoreTenant @relation("CoreApiKeyTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([key_prefix])
+  @@map("core_api_keys")
+}
+
+model CoreWebhookSubscription {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  product_key String    @db.VarChar(100)
+  event_key   String    @db.VarChar(200)
+  target_url  String    @db.Text
+  secret      String?   @db.VarChar(500)
+  is_active   Boolean   @default(true)
+  deleted_at  DateTime? @db.Timestamptz
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+
+  tenant     CoreTenant           @relation("CoreWebhookSubscriptionTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+  deliveries CoreWebhookDelivery[]
+
+  @@index([tenant_id])
+  @@index([event_key])
+  @@map("core_webhook_subscriptions")
+}
+
+model CoreWebhookDelivery {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subscription_id String    @db.Uuid
+  tenant_id       String    @db.Uuid
+  event_key       String    @db.VarChar(200)
+  payload         Json      @default("{}") @db.JsonB
+  status          String    @default("pending") @db.VarChar(20)
+  attempt_count   Int       @default(0)
+  last_attempt_at DateTime? @db.Timestamptz
+  next_retry_at   DateTime? @db.Timestamptz
+  response_status Int?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  subscription CoreWebhookSubscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+  tenant       CoreTenant              @relation("CoreWebhookDeliveryTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([subscription_id])
+  @@index([status, next_retry_at])
+  @@map("core_webhook_deliveries")
 }

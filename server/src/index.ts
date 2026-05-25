@@ -220,3 +220,22 @@ export {
 } from './modules/reporting/reporting.service.js';
 
 export { default as coreReportingRouter } from './modules/reporting/reporting.router.js';
+
+// ── E2.15a: Integration Framework (API Keys + Webhooks) ───────────────────────
+
+export {
+  generateApiKey,
+  listApiKeys,
+  revokeApiKey,
+  validateApiKey,
+  registerWebhookEvents,
+  getWebhookEvents,
+  createSubscription,
+  listSubscriptions,
+  deleteSubscription,
+  listDeliveries,
+  dispatchWebhook,
+  retryFailedDeliveries,
+} from './modules/integration/integration.service.js';
+
+export { default as coreIntegrationsRouter } from './modules/integration/integration.router.js';
