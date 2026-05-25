@@ -109,6 +109,7 @@ model CoreTenant {
   oauthTokens          CoreOAuthToken[]           @relation("CoreOAuthTokenTenant")
   licenses             CoreTenantLicense[]        @relation("CoreTenantLicenses")
   supportModeSessions  CoreSupportModeSession[]   @relation("CoreSupportModeSessions")
+  feedNotifications    CoreTenantFeedNotification[] @relation("CoreFeedNotificationTenant")
 
   @@map("core_tenants")
 }
@@ -862,4 +863,76 @@ model CoreSupportModeSession {
   @@index([tenant_id])
   @@index([super_admin_user_id])
   @@map("core_support_mode_sessions")
+}
+
+// ─── E2.17: Regulatory Feed Curation ─────────────────────────────────────────
+// Platform-level (no tenant_id) feed source registry and ingested items.
+// core_tenant_feed_notifications is tenant-scoped.
+
+enum CoreFeedReviewStatus {
+  pending
+  approved
+  rejected
+  mapped
+
+  @@map("core_feed_review_status")
+}
+
+model CoreFeedSource {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  url             String
+  scrape_schedule String?   @db.VarChar(100)
+  parse_rules     Json?     @db.JsonB
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+  deleted_at      DateTime? @db.Timestamptz
+
+  items CoreFeedItem[]
+
+  @@map("core_feed_sources")
+}
+
+model CoreFeedItem {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source_id       String?              @db.Uuid
+  external_id     String?              @db.VarChar(500)
+  title           String
+  summary         String?              @db.Text
+  url             String?              @db.Text
+  published_at    DateTime?            @db.Timestamptz
+  raw_payload     Json?                @db.JsonB
+  review_status   CoreFeedReviewStatus @default(pending)
+  regulation_code String?              @db.VarChar(100)
+  reviewed_by     String?              @db.Uuid
+  reviewed_at     DateTime?            @db.Timestamptz
+  created_at      DateTime             @default(now()) @db.Timestamptz
+  updated_at      DateTime             @updatedAt @db.Timestamptz
+
+  source        CoreFeedSource?             @relation(fields: [source_id], references: [id])
+  notifications CoreTenantFeedNotification[]
+
+  @@unique([source_id, external_id])
+  @@index([review_status])
+  @@index([regulation_code])
+  @@index([created_at(sort: Desc)])
+  @@map("core_feed_items")
+}
+
+model CoreTenantFeedNotification {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  feed_item_id      String    @db.Uuid
+  notification_type String    @db.VarChar(50)
+  notified_at       DateTime  @default(now()) @db.Timestamptz
+  read_at           DateTime? @db.Timestamptz
+
+  tenant    CoreTenant   @relation("CoreFeedNotificationTenant", fields: [tenant_id], references: [id], onDelete: Cascade)
+  feed_item CoreFeedItem @relation(fields: [feed_item_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([tenant_id, read_at])
+  @@index([feed_item_id])
+  @@map("core_tenant_feed_notifications")
 }

@@ -284,3 +284,22 @@ export {
 } from './modules/tenantMgmt/tenantMgmt.service.js';
 
 export { default as coreSuperAdminRouter } from './modules/tenantMgmt/tenantMgmt.router.js';
+
+// ── E2.17: Regulatory Feed Curation ───────────────────────────────────────────
+
+export {
+  registerFeedSource,
+  listFeedSources,
+  updateFeedSource,
+  deleteFeedSource,
+  ingestFeedItems,
+  listFeedItems,
+  getFeedItem,
+  reviewFeedItem,
+  notifyTenantsOfFeedItem,
+  getTenantNotifications,
+  markNotificationRead,
+  type ListFeedItemsFilter,
+} from './modules/regulatoryFeed/regulatoryFeed.service.js';
+
+export { default as coreRegulatoryFeedRouter } from './modules/regulatoryFeed/regulatoryFeed.router.js';
