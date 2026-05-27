@@ -9,10 +9,10 @@
  *   - aiComplete ← new unified completion helper
  *
  * Strangler bridge:
- *   saveAiConfig  mirrors to tenant_settings.ai_config   (legacy Privacy JSONB field)
- *   removeAiConfig clears tenant_settings.ai_config
- *   resolveAiCredentials reads core table first, falls back to tenant_settings.ai_config
- *   logAiUsage mirrors to ai_usage_logs                  (legacy Privacy table)
+ *   saveAiConfig  mirrors to privacy_tenant_settings.ai_config   (legacy Privacy JSONB field)
+ *   removeAiConfig clears privacy_tenant_settings.ai_config
+ *   resolveAiCredentials reads core table first, falls back to privacy_tenant_settings.ai_config
+ *   logAiUsage mirrors to privacy_ai_usage_logs                  (legacy Privacy table)
  */
 
 import crypto from 'crypto';
@@ -135,9 +135,9 @@ export async function getAiConfig(tenantId: string): Promise<CoreAiConfig | null
     };
   }
 
-  // Fall back to legacy tenant_settings.ai_config
+  // Fall back to legacy privacy_tenant_settings.ai_config
   const legacy = await prisma.$queryRaw<Array<{ ai_config: unknown }>>`
-    SELECT ai_config FROM tenant_settings WHERE tenant_id = ${tenantId}::uuid LIMIT 1
+    SELECT ai_config FROM privacy_tenant_settings WHERE tenant_id = ${tenantId}::uuid LIMIT 1
   `;
   if (!legacy[0]?.ai_config) return null;
 
@@ -200,7 +200,7 @@ export async function saveAiConfig(
     },
   });
 
-  // Strangler bridge: mirror to legacy tenant_settings.ai_config JSONB (fire-and-forget)
+  // Strangler bridge: mirror to legacy privacy_tenant_settings.ai_config JSONB (fire-and-forget)
   const legacyStored = JSON.stringify({
     provider: data.provider,
     model: data.model,
@@ -215,7 +215,7 @@ export async function saveAiConfig(
     configuredBy: userId,
   });
   prisma.$executeRaw`
-    UPDATE tenant_settings SET ai_config = ${legacyStored}::jsonb
+    UPDATE privacy_tenant_settings SET ai_config = ${legacyStored}::jsonb
     WHERE tenant_id = ${tenantId}::uuid
   `.catch(() => {});
 
@@ -237,9 +237,9 @@ export async function removeAiConfig(tenantId: string): Promise<void> {
   // Delete from Core table (ignore if not found)
   await prisma.coreAiTenantConfig.deleteMany({ where: { tenant_id: tenantId } });
 
-  // Mirror: clear legacy tenant_settings.ai_config (fire-and-forget)
+  // Mirror: clear legacy privacy_tenant_settings.ai_config (fire-and-forget)
   prisma.$executeRaw`
-    UPDATE tenant_settings SET ai_config = NULL WHERE tenant_id = ${tenantId}::uuid
+    UPDATE privacy_tenant_settings SET ai_config = NULL WHERE tenant_id = ${tenantId}::uuid
   `.catch(() => {});
 }
 
@@ -277,9 +277,9 @@ export async function resolveAiCredentials(tenantId: string): Promise<{
     };
   }
 
-  // 2. Legacy tenant_settings.ai_config (backward compat for tenants not yet migrated to Core)
+  // 2. Legacy privacy_tenant_settings.ai_config (backward compat for tenants not yet migrated to Core)
   const legacy = await prisma.$queryRaw<Array<{ ai_config: unknown }>>`
-    SELECT ai_config FROM tenant_settings WHERE tenant_id = ${tenantId}::uuid LIMIT 1
+    SELECT ai_config FROM privacy_tenant_settings WHERE tenant_id = ${tenantId}::uuid LIMIT 1
   `;
   if (legacy[0]?.ai_config) {
     const stored = legacy[0].ai_config as Record<string, string>;
@@ -346,7 +346,7 @@ export async function getAiConfigStatusForAdmin(tenantId: string): Promise<{
 
   // Check legacy
   const legacy = await prisma.$queryRaw<Array<{ ai_config: unknown }>>`
-    SELECT ai_config FROM tenant_settings WHERE tenant_id = ${tenantId}::uuid LIMIT 1
+    SELECT ai_config FROM privacy_tenant_settings WHERE tenant_id = ${tenantId}::uuid LIMIT 1
   `;
   if (!legacy[0]?.ai_config) return { isConfigured: false };
   const stored = legacy[0].ai_config as Record<string, string>;
@@ -397,9 +397,9 @@ export function logAiUsage(params: LogAiUsageParams): void {
       console.warn('[coreAi] Failed to write core_ai_usage_logs:', msg);
     });
 
-  // Strangler bridge: also write to legacy ai_usage_logs
+  // Strangler bridge: also write to legacy privacy_ai_usage_logs
   prisma.$executeRaw`
-    INSERT INTO ai_usage_logs (
+    INSERT INTO privacy_ai_usage_logs (
       tenant_id, user_id, scope, feature, provider, model,
       input_tokens, output_tokens, total_tokens, estimated_cost_usd,
       latency_ms, status, error_code, request_id
@@ -421,7 +421,7 @@ export function logAiUsage(params: LogAiUsageParams): void {
     )
   `.catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn('[coreAi] Failed to mirror to ai_usage_logs:', msg);
+    console.warn('[coreAi] Failed to mirror to privacy_ai_usage_logs:', msg);
   });
 }
 

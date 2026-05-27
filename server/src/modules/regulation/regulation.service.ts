@@ -1,6 +1,6 @@
 // E2.8a: Regulation Library read path + tenant toggles extracted to gracie-core.
 // Write path (createRegulation, updateRequirement, etc.) remains in Privacy — E2.8b.
-// compliance_requirements table is NOT moved in this session — reads via $queryRaw.
+// privacy_compliance_requirements table is NOT moved in this session — reads via $queryRaw.
 import prisma from '../../lib/prisma.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ export async function listRegulations(): Promise<CoreRegulationSummary[]> {
       COUNT(DISTINCT rd.id) FILTER (WHERE rd.deleted_at IS NULL AND rd.is_visible = true) AS doc_count,
       COUNT(DISTINCT trt.tenant_id) FILTER (WHERE trt.is_enabled = true) AS tenant_count
     FROM core_regulations r
-    LEFT JOIN compliance_requirements cr ON cr.regulation_code = r.code
+    LEFT JOIN privacy_compliance_requirements cr ON cr.regulation_code = r.code
     LEFT JOIN core_regulation_documents rd ON rd.regulation_id = r.id
     LEFT JOIN core_tenant_regulation_toggles trt ON trt.regulation_id = r.id
     GROUP BY r.id
@@ -150,7 +150,7 @@ export async function getRegulation(id: string): Promise<CoreRegulationSummary> 
       COUNT(DISTINCT rd.id) FILTER (WHERE rd.deleted_at IS NULL) AS doc_count,
       COUNT(DISTINCT trt.tenant_id) FILTER (WHERE trt.is_enabled = true) AS tenant_count
     FROM core_regulations r
-    LEFT JOIN compliance_requirements cr ON cr.regulation_code = r.code
+    LEFT JOIN privacy_compliance_requirements cr ON cr.regulation_code = r.code
     LEFT JOIN core_regulation_documents rd ON rd.regulation_id = r.id
     LEFT JOIN core_tenant_regulation_toggles trt ON trt.regulation_id = r.id
     WHERE r.id = ${id}::uuid
@@ -161,7 +161,7 @@ export async function getRegulation(id: string): Promise<CoreRegulationSummary> 
   return mapRegulation(regs[0]);
 }
 
-// compliance_requirements is an existing Privacy table — NOT moved in E2.8a.
+// privacy_compliance_requirements is an existing Privacy table — NOT moved in E2.8a.
 export async function listRequirements(regulationId: string): Promise<unknown[]> {
   const regs = await prisma.$queryRaw<{ code: string }[]>`
     SELECT code FROM core_regulations WHERE id = ${regulationId}::uuid
@@ -172,7 +172,7 @@ export async function listRequirements(regulationId: string): Promise<unknown[]>
 
   return prisma.$queryRaw<Record<string, unknown>[]>`
     SELECT cr.*, pp.code AS principle_code, pp.name AS principle_name
-    FROM compliance_requirements cr
+    FROM privacy_compliance_requirements cr
     LEFT JOIN core_privacy_principles pp ON pp.id = cr.principle_id
     WHERE cr.regulation_code = ${regCode}
       AND cr.tenant_id IS NULL
@@ -305,9 +305,9 @@ export async function createRegulation(data: {
     ) RETURNING *
   `;
 
-  // Mirror to legacy regulations table (strangler bridge)
+  // Mirror to legacy privacy_regulations table (strangler bridge)
   await prisma.$executeRaw`
-    INSERT INTO regulations (
+    INSERT INTO privacy_regulations (
       code, name, short_name, jurisdiction, authority, effective_date,
       description, status, terminology, legal_basis_options, country_codes,
       is_active, created_at, updated_at
@@ -351,7 +351,7 @@ export async function updateRegulation(id: string, data: Record<string, unknown>
     );
   }
 
-  // Mirror to legacy regulations table (find by code, same fields)
+  // Mirror to legacy privacy_regulations table (find by code, same fields)
   const legSets: string[] = ['updated_at = now()'];
   const legVals: unknown[] = [reg.code];
   let li = 2;
@@ -370,7 +370,7 @@ export async function updateRegulation(id: string, data: Record<string, unknown>
 
   if (legSets.length > 1) {
     await prisma.$executeRawUnsafe(
-      `UPDATE regulations SET ${legSets.join(', ')} WHERE code = $1`,
+      `UPDATE privacy_regulations SET ${legSets.join(', ')} WHERE code = $1`,
       ...legVals,
     );
   }
@@ -390,7 +390,7 @@ export async function publishRegulation(id: string, changelog?: string) {
   `;
   // Mirror to legacy
   await prisma.$executeRaw`
-    UPDATE regulations
+    UPDATE privacy_regulations
     SET status = 'published', is_active = true, changelog = ${changelogVal}, updated_at = now()
     WHERE code = ${reg.code}
   `;
@@ -407,7 +407,7 @@ export async function deprecateRegulation(id: string) {
   `;
   // Mirror to legacy
   await prisma.$executeRaw`
-    UPDATE regulations SET status = 'deprecated', is_active = false, updated_at = now()
+    UPDATE privacy_regulations SET status = 'deprecated', is_active = false, updated_at = now()
     WHERE code = ${reg.code}
   `;
   return prisma.coreRegulation.findUniqueOrThrow({ where: { id } });
@@ -433,8 +433,8 @@ export async function deleteRegulation(id: string): Promise<void> {
   await prisma.$executeRaw`DELETE FROM core_regulation_documents WHERE regulation_id = ${id}::uuid`;
   await prisma.$executeRaw`DELETE FROM core_regulations WHERE id = ${id}::uuid`;
 
-  // Mirror: remove from legacy regulations table (relies on DB-level CASCADE for legacy child rows)
-  await prisma.$executeRaw`DELETE FROM regulations WHERE code = ${reg.code}`;
+  // Mirror: remove from legacy privacy_regulations table (relies on DB-level CASCADE for legacy child rows)
+  await prisma.$executeRaw`DELETE FROM privacy_regulations WHERE code = ${reg.code}`;
 }
 
 // ── Tenant-facing document reads (E2.8b) ─────────────────────────────────────
