@@ -120,6 +120,7 @@ export async function createSubscription(
       event_key: eventKey,
       target_url: targetUrl,
       secret: secret ?? null,
+      is_active: true,
     },
   });
   return mapSubscription(sub);

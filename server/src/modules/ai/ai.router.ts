@@ -79,6 +79,7 @@ router.get(
   '/config/status',
   requireAuth,
   requireTenant,
+  orgAdminOnly,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const tenantId = req.user!.tenantId as string;
