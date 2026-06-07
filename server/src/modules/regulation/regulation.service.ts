@@ -305,14 +305,16 @@ export async function createRegulation(data: {
     ) RETURNING *
   `;
 
-  // Mirror to legacy privacy_regulations table (strangler bridge)
+  // Mirror to legacy privacy_regulations table (strangler bridge).
+  // Use the same id generated above so both tables share one canonical UUID (Session A fix).
+  const coreId = rows[0]?.id as string;
   await prisma.$executeRaw`
     INSERT INTO privacy_regulations (
-      code, name, short_name, jurisdiction, authority, effective_date,
+      id, code, name, short_name, jurisdiction, authority, effective_date,
       description, status, terminology, legal_basis_options, country_codes,
       is_active, created_at, updated_at
     ) VALUES (
-      ${code}, ${data.name}, ${data.shortName ?? null},
+      ${coreId}::uuid, ${code}, ${data.name}, ${data.shortName ?? null},
       ${data.jurisdiction ?? ''}, ${data.authority ?? null},
       ${data.effectiveDate ? new Date(data.effectiveDate) : null},
       ${data.description ?? null}, 'draft',
