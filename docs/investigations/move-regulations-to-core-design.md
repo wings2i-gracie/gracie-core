@@ -312,6 +312,8 @@ All of the following must be true before `privacy_regulations` can be dropped:
 - No schema changes, no data changes, no FK moves.
 - Target: zero remaining `prisma.regulation` usages in Privacy server code except for the toggle-table join patterns (R22/R25) deferred to Session C.
 
+**Audit-missed reader (migrated in Session B):** `pi-contexts/piContexts.service.ts` — `getEnabledTenantRegulations` — was a direct `prisma.regulation.findMany` read not assigned an Rnn number in the original audit. Discovered during the Session B grep pass; migrated using the same `listRegulations()` pattern as B1/B2.
+
 > **Human review checkpoint after Session B:** Run `grep -rn "prisma\.regulation" server/src/` and confirm no hits except R22/R25 toggle-join patterns. Full UAT smoke test across all regulation-touching screens: Regulatory Watch, Organisation Setup regulation toggles, PI Context form, Compliance dashboard, Breach creation, Canonical suggestions.
 
 **Risk level:** Medium. This is the highest-code-volume session (~8 files changed). Each change is a read migration that must be validated end-to-end. Recommended: do in a feature branch with isolated regression testing per service file before merging.
