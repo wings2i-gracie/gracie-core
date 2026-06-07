@@ -92,3 +92,5 @@ E2.6 (2026-05-26) — Tasks engine extraction.
   requireTenant. Full CRUD + stats + templates.
   index.ts: exports coreTasksRouter + all task service functions + enum types.
   v0.2.0-alpha.3 tagged.
+S-CDD1-CHECKPOINT (2026-06-07) — read-only investigation of Library ownership-scope; findings in docs/investigations/CDD1-library-ownership-scope-findings.md; no code changed.
+S-REGTABLE-DUP-CHECKPOINT (2026-06-07) — read-only investigation of privacy_regulations + toggle-table duplication; findings in docs/investigations/regulation-table-duplication-findings.md; no code changed.
