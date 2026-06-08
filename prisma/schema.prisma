@@ -513,6 +513,8 @@ model CoreRegulationDocument {
   page_count        Int?
   is_visible        Boolean   @default(true)
   sort_order        Int       @default(0)
+  owner_scope       String    @default("GLOBAL")
+  tenant_id         String?   @db.Uuid
   created_by        String    @db.Uuid
   created_at        DateTime  @default(now()) @db.Timestamptz
   updated_at        DateTime  @updatedAt @db.Timestamptz

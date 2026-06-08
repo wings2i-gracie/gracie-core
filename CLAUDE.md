@@ -94,3 +94,4 @@ E2.6 (2026-05-26) — Tasks engine extraction.
   v0.2.0-alpha.3 tagged.
 S-CDD1-CHECKPOINT (2026-06-07) — read-only investigation of Library ownership-scope; findings in docs/investigations/CDD1-library-ownership-scope-findings.md; no code changed.
 S-REGTABLE-DUP-CHECKPOINT (2026-06-07) — read-only investigation of privacy_regulations + toggle-table duplication; findings in docs/investigations/regulation-table-duplication-findings.md; no code changed.
+C-DD1-OWNERSHIP-SCOPE (2026-06-08) — migration 20260608000001 adds owner_scope/tenant_id/CHECK/index to core_regulation_documents; listRegulations() GLOBAL-only filter; listRegulationsWithToggles() scope predicate; createTenantFramework() (org_admin|compliance_manager); ownerScope+tenantId surfaced in both mapped types; 0 tsc errors; migration applied cleanly; no-leakage proof confirmed (a/b/c).

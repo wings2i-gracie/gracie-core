@@ -139,6 +139,7 @@ export {
   listRegulationsWithToggles,
   toggleRegulation,
   createRegulation as coreCreateRegulation,
+  createTenantFramework as coreCreateTenantFramework,
   updateRegulation as coreUpdateRegulation,
   publishRegulation as corePublishRegulation,
   deprecateRegulation as coreDeprecateRegulation,

@@ -9,6 +9,7 @@ import {
   listDocuments,
   listRegulationsWithToggles,
   toggleRegulation,
+  createTenantFramework,
 } from './regulation.service.js';
 
 const router = Router();
@@ -74,6 +75,25 @@ router.get(
     try {
       const data = await listRegulationsWithToggles(req.user!.tenantId!, req.user!.id);
       res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// POST /api/v1/core/tenant/regulations/frameworks
+// Creates a tenant-private regulation framework (owner_scope='TENANT').
+// Gated to org_admin / compliance_manager — the most restrictive tenant roles that can manage
+// compliance configuration. super_admin is excluded deliberately: they manage tenant frameworks
+// through support mode (which impersonates the tenant and uses the tenant-scoped path).
+router.post(
+  '/tenant/regulations/frameworks',
+  requireTenant,
+  requireRole('org_admin', 'compliance_manager'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await createTenantFramework(req.user!.tenantId!, req.body as Parameters<typeof createTenantFramework>[1]);
+      res.status(201).json({ success: true, data });
     } catch (err) {
       next(err);
     }

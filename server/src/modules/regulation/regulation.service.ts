@@ -20,6 +20,8 @@ export interface CoreRegulationSummary {
   countryCodes: string[] | null;
   changelog: string | null;
   isActive: boolean;
+  ownerScope: string;
+  tenantId: string | null;
   requirementCount: number;
   docCount: number;
   tenantCount: number;
@@ -42,6 +44,8 @@ export interface CoreRegulationWithToggle {
   countryCodes: string[] | null;
   changelog: string | null;
   isActive: boolean;
+  ownerScope: string;
+  tenantId: string | null;
   createdAt: string;
   updatedAt: string;
   isEnabled: boolean;
@@ -70,6 +74,8 @@ function mapRegulation(r: Record<string, unknown>): CoreRegulationSummary {
     countryCodes: (r.country_codes as string[] | null) ?? null,
     changelog: (r.changelog as string | null) ?? null,
     isActive: Boolean(r.is_active),
+    ownerScope: (r.owner_scope as string) ?? 'GLOBAL',
+    tenantId: (r.tenant_id as string | null) ?? null,
     requirementCount: Number(r.requirement_count ?? 0),
     docCount: Number(r.doc_count ?? 0),
     tenantCount: Number(r.tenant_count ?? 0),
@@ -124,8 +130,24 @@ function mapDocument(d: {
   };
 }
 
+// ── Scope helpers ─────────────────────────────────────────────────────────────
+
+// Builds the tenant-facing visibility predicate: GLOBAL rows are always visible;
+// TENANT-scoped rows are visible only to the authoring tenant.
+function scopePredicateForTenant(tenantId: string) {
+  return {
+    OR: [
+      { owner_scope: 'GLOBAL' },
+      { owner_scope: 'TENANT', tenant_id: tenantId },
+    ],
+  };
+}
+
 // ── Read path ────────────────────────────────────────────────────────────────
 
+// Super-admin Library default view: GLOBAL rows only.
+// TENANT-scoped rows are NOT shown here; super-admins access them via support-mode
+// (which impersonates a tenant and routes through listRegulationsWithToggles).
 export async function listRegulations(): Promise<CoreRegulationSummary[]> {
   const regs = await prisma.$queryRaw<Record<string, unknown>[]>`
     SELECT r.*,
@@ -136,6 +158,7 @@ export async function listRegulations(): Promise<CoreRegulationSummary[]> {
     LEFT JOIN privacy_compliance_requirements cr ON cr.regulation_code = r.code
     LEFT JOIN core_regulation_documents rd ON rd.regulation_id = r.id
     LEFT JOIN core_tenant_regulation_toggles trt ON trt.regulation_id = r.id
+    WHERE r.owner_scope = 'GLOBAL'
     GROUP BY r.id
     ORDER BY r.name
   `;
@@ -212,7 +235,12 @@ export async function listRegulationsWithToggles(
 ): Promise<CoreRegulationWithToggle[]> {
   const [regs, toggles] = await Promise.all([
     prisma.coreRegulation.findMany({
-      where: { OR: [{ status: 'published' }, { is_active: true }] },
+      where: {
+        AND: [
+          { OR: [{ status: 'published' }, { is_active: true }] },
+          scopePredicateForTenant(tenantId),
+        ],
+      },
       orderBy: { name: 'asc' },
     }),
     prisma.coreTenantRegulationToggle.findMany({ where: { tenant_id: tenantId } }),
@@ -255,6 +283,8 @@ export async function listRegulationsWithToggles(
     countryCodes: r.country_codes as string[] | null,
     changelog: r.changelog ?? null,
     isActive: r.is_active,
+    ownerScope: r.owner_scope,
+    tenantId: r.tenant_id ?? null,
     createdAt: r.created_at.toISOString(),
     updatedAt: r.updated_at.toISOString(),
     isEnabled: toggleMap.get(r.id)?.isEnabled ?? false,
@@ -301,6 +331,64 @@ export async function createRegulation(data: {
       ${data.description ?? null}, 'draft',
       ${terminologyJson}::jsonb, ${lboJson}::jsonb, ${ccJson}::jsonb,
       false, now(), now()
+    ) RETURNING *
+  `;
+
+  return rows[0];
+}
+
+// Creates a tenant-private regulation framework (owner_scope='TENANT').
+// tenantId MUST come from the authenticated request context — never from request body.
+// Gated to org_admin / compliance_manager in the router.
+export async function createTenantFramework(
+  tenantId: string,
+  data: {
+    code: string;
+    name: string;
+    shortName?: string;
+    jurisdiction?: string;
+    authority?: string;
+    effectiveDate?: string;
+    description?: string;
+    terminology?: Record<string, string>;
+    legalBasisOptions?: Array<{ key: string; label: string; description: string }>;
+    countryCodes?: string[];
+  },
+) {
+  if (!data.code || !data.name) {
+    throw Object.assign(new Error('code and name are required'), { statusCode: 400, code: 'VALIDATION_ERROR' });
+  }
+  const code = data.code.toUpperCase();
+
+  // Uniqueness is per-tenant: two tenants may independently define a framework with the same code.
+  const existing = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM core_regulations
+    WHERE code = ${code} AND owner_scope = 'TENANT' AND tenant_id = ${tenantId}::uuid
+    LIMIT 1
+  `;
+  if (existing.length > 0) {
+    throw Object.assign(
+      new Error(`Framework code ${code} already exists for this organisation`),
+      { statusCode: 409, code: 'DUPLICATE_CODE' },
+    );
+  }
+
+  const terminologyJson = data.terminology ? JSON.stringify(data.terminology) : null;
+  const lboJson = data.legalBasisOptions ? JSON.stringify(data.legalBasisOptions) : null;
+  const ccJson = data.countryCodes ? JSON.stringify(data.countryCodes) : null;
+
+  const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+    INSERT INTO core_regulations (
+      code, name, short_name, jurisdiction, authority, effective_date,
+      description, status, terminology, legal_basis_options, country_codes,
+      is_active, owner_scope, tenant_id, created_at, updated_at
+    ) VALUES (
+      ${code}, ${data.name}, ${data.shortName ?? null},
+      ${data.jurisdiction ?? ''}, ${data.authority ?? null},
+      ${data.effectiveDate ? new Date(data.effectiveDate) : null},
+      ${data.description ?? null}, 'draft',
+      ${terminologyJson}::jsonb, ${lboJson}::jsonb, ${ccJson}::jsonb,
+      false, 'TENANT', ${tenantId}::uuid, now(), now()
     ) RETURNING *
   `;
 
