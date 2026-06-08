@@ -1,6 +1,5 @@
-// E2.8a: Regulation Library read path + tenant toggles extracted to gracie-core.
-// Write path (createRegulation, updateRequirement, etc.) remains in Privacy — E2.8b.
-// privacy_compliance_requirements table is NOT moved in this session — reads via $queryRaw.
+// Regulation service — owns core_regulations (Session C: write bridge removed; privacy_regulations retired app-side).
+// privacy_compliance_requirements table reads via $queryRaw (not moved).
 import prisma from '../../lib/prisma.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -263,7 +262,7 @@ export async function listRegulationsWithToggles(
   }));
 }
 
-// ── Write path (E2.8b) ───────────────────────────────────────────────────────
+// ── Write path ───────────────────────────────────────────────────────────────
 
 export async function createRegulation(data: {
   code: string;
@@ -305,24 +304,6 @@ export async function createRegulation(data: {
     ) RETURNING *
   `;
 
-  // Mirror to legacy privacy_regulations table (strangler bridge).
-  // Use the same id generated above so both tables share one canonical UUID (Session A fix).
-  const coreId = rows[0]?.id as string;
-  await prisma.$executeRaw`
-    INSERT INTO privacy_regulations (
-      id, code, name, short_name, jurisdiction, authority, effective_date,
-      description, status, terminology, legal_basis_options, country_codes,
-      is_active, created_at, updated_at
-    ) VALUES (
-      ${coreId}::uuid, ${code}, ${data.name}, ${data.shortName ?? null},
-      ${data.jurisdiction ?? ''}, ${data.authority ?? null},
-      ${data.effectiveDate ? new Date(data.effectiveDate) : null},
-      ${data.description ?? null}, 'draft',
-      ${terminologyJson}::jsonb, ${lboJson}::jsonb, ${ccJson}::jsonb,
-      false, now(), now()
-    ) ON CONFLICT (code) DO NOTHING
-  `;
-
   return rows[0];
 }
 
@@ -353,30 +334,6 @@ export async function updateRegulation(id: string, data: Record<string, unknown>
     );
   }
 
-  // Mirror to legacy privacy_regulations table (find by code, same fields)
-  const legSets: string[] = ['updated_at = now()'];
-  const legVals: unknown[] = [reg.code];
-  let li = 2;
-
-  if (data.name !== undefined) { legSets.push(`name = $${li++}`); legVals.push(data.name); }
-  if (data.shortName !== undefined) { legSets.push(`short_name = $${li++}`); legVals.push(data.shortName); }
-  if (data.jurisdiction !== undefined) { legSets.push(`jurisdiction = $${li++}`); legVals.push(data.jurisdiction); }
-  if (data.authority !== undefined) { legSets.push(`authority = $${li++}`); legVals.push(data.authority ?? null); }
-  if ('effectiveDate' in data) { legSets.push(`effective_date = $${li++}`); legVals.push(data.effectiveDate ? new Date(data.effectiveDate as string) : null); }
-  if (data.description !== undefined) { legSets.push(`description = $${li++}`); legVals.push(data.description); }
-  if (data.status !== undefined) { legSets.push(`status = $${li++}`); legVals.push(data.status); }
-  if (data.changelog !== undefined) { legSets.push(`changelog = $${li++}`); legVals.push(data.changelog); }
-  if (data.terminology !== undefined) { legSets.push(`terminology = $${li++}::jsonb`); legVals.push(JSON.stringify(data.terminology)); }
-  if (data.legalBasisOptions !== undefined) { legSets.push(`legal_basis_options = $${li++}::jsonb`); legVals.push(JSON.stringify(data.legalBasisOptions)); }
-  if (data.countryCodes !== undefined) { legSets.push(`country_codes = $${li++}::jsonb`); legVals.push(JSON.stringify(data.countryCodes)); }
-
-  if (legSets.length > 1) {
-    await prisma.$executeRawUnsafe(
-      `UPDATE privacy_regulations SET ${legSets.join(', ')} WHERE code = $1`,
-      ...legVals,
-    );
-  }
-
   return prisma.coreRegulation.findUniqueOrThrow({ where: { id } });
 }
 
@@ -390,12 +347,6 @@ export async function publishRegulation(id: string, changelog?: string) {
     SET status = 'published', is_active = true, changelog = ${changelogVal}, updated_at = now()
     WHERE id = ${id}::uuid
   `;
-  // Mirror to legacy
-  await prisma.$executeRaw`
-    UPDATE privacy_regulations
-    SET status = 'published', is_active = true, changelog = ${changelogVal}, updated_at = now()
-    WHERE code = ${reg.code}
-  `;
   return prisma.coreRegulation.findUniqueOrThrow({ where: { id } });
 }
 
@@ -406,11 +357,6 @@ export async function deprecateRegulation(id: string) {
   await prisma.$executeRaw`
     UPDATE core_regulations SET status = 'deprecated', is_active = false, updated_at = now()
     WHERE id = ${id}::uuid
-  `;
-  // Mirror to legacy
-  await prisma.$executeRaw`
-    UPDATE privacy_regulations SET status = 'deprecated', is_active = false, updated_at = now()
-    WHERE code = ${reg.code}
   `;
   return prisma.coreRegulation.findUniqueOrThrow({ where: { id } });
 }
@@ -435,8 +381,6 @@ export async function deleteRegulation(id: string): Promise<void> {
   await prisma.$executeRaw`DELETE FROM core_regulation_documents WHERE regulation_id = ${id}::uuid`;
   await prisma.$executeRaw`DELETE FROM core_regulations WHERE id = ${id}::uuid`;
 
-  // Mirror: remove from legacy privacy_regulations table (relies on DB-level CASCADE for legacy child rows)
-  await prisma.$executeRaw`DELETE FROM privacy_regulations WHERE code = ${reg.code}`;
 }
 
 // ── Tenant-facing document reads (E2.8b) ─────────────────────────────────────
