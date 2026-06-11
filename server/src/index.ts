@@ -316,3 +316,18 @@ export {
 } from './modules/shellRegistry/shellRegistry.service.js';
 
 export { default as shellRegistryRouter } from './modules/shellRegistry/shellRegistry.router.js';
+
+// ── Seq 4a: Role Registry ─────────────────────────────────────────────────────
+
+export {
+  registerRole,
+  getRegisteredRole,
+  listRegisteredRoles,
+  getAllRoleKeys,
+  isKnownRole,
+  getConfigurableRoleKeys,
+  getNotifiableRoleKeys,
+  type RoleRegistration,
+} from './modules/roles/roleRegistry.service.js';
+
+export { default as coreRoleRegistryRouter } from './modules/roles/roleRegistry.router.js';

@@ -18,18 +18,8 @@ enum TenantStatus {
   @@map("tenant_status")
 }
 
-enum UserRole {
-  super_admin
-  org_admin
-  compliance_manager
-  leadership
-  function_owner
-  context_owner
-  auditor
-  viewer
-
-  @@map("user_role")
-}
+// UserRole enum removed (Seq 4a): column type converted to VARCHAR in Privacy migration
+// 20260611000001_user_role_to_varchar. Role values validated via Core role registry.
 
 // Task enums — map to existing PostgreSQL enum types created by Privacy migrations.
 
@@ -136,7 +126,7 @@ model CoreUser {
   password_hash        String
   first_name           String
   last_name            String
-  role                 UserRole
+  role                 String
   function_id          String?   @db.Uuid
   location_id          String?   @db.Uuid
   is_active            Boolean   @default(true)

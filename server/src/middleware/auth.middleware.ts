@@ -1,11 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import type { UserRole } from '../modules/auth/auth.service.js';
-
 interface JwtPayload {
   id: string;
   email: string;
-  role: UserRole;
+  role: string;
   tenantId: string | null;
   organisationId: string | null;
   functionId: string | null;
