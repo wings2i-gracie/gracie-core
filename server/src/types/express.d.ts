@@ -3,7 +3,7 @@ declare module 'express-serve-static-core' {
     user?: {
       id: string;
       email: string;
-      role: 'super_admin' | 'org_admin' | 'compliance_manager' | 'leadership' | 'function_owner' | 'context_owner' | 'auditor' | 'viewer';
+      role: string;
       tenantId: string | null;
       organisationId: string | null;
       functionId: string | null;

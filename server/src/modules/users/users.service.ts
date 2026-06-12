@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../../lib/prisma.js';
-import type { UserRole } from '../auth/auth.service.js';
 import { generateTempPassword } from '../auth/auth.service.js';
 
 export async function getUsers(tenantId: string) {
@@ -32,7 +31,7 @@ export async function updateUser(
   tenantId: string,
   userId: string,
   actorId: string,
-  role: UserRole,
+  role: string,
   functionId?: string | null,
   locationId?: string | null,
 ) {

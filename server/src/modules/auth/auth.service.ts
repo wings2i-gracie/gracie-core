@@ -16,7 +16,7 @@ export type UserRole =
 export interface CoreTokenPayload {
   id: string;
   email: string;
-  role: UserRole;
+  role: string;
   tenantId: string | null;
   organisationId: string | null;
   functionId: string | null;
@@ -32,7 +32,7 @@ export function generateAccessToken(payload: CoreTokenPayload): string {
 export function buildTokenPayload(user: {
   id: string;
   email: string;
-  role: UserRole;
+  role: string;
   tenant_id: string | null;
   organisation_id: string | null;
   function_id: string | null;
