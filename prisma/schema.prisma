@@ -239,6 +239,26 @@ model CoreFunction {
   @@map("functions")
 }
 
+// Seq 4c-0: user×function ownership grant. One user may own MANY functions;
+// ownership grants access (supplements CoreUser.function_id — does NOT replace it).
+// Role-independent capability table — role-gating lives in the consuming resolver.
+// References core_users.id / functions.id as plain UUIDs (no relation objects) so
+// the CoreUser / CoreFunction models stay untouched — purely additive.
+model CoreUserFunctionGrant {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  user_id     String    @db.Uuid
+  function_id String    @db.Uuid
+  granted_by  String?   @db.Uuid
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  deleted_at  DateTime? @db.Timestamptz
+
+  @@unique([tenant_id, user_id, function_id])
+  @@index([tenant_id, user_id])
+  @@map("core_user_function_grants")
+}
+
 model CoreLocation {
   id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id                String   @db.Uuid

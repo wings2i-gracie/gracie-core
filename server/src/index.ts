@@ -331,3 +331,13 @@ export {
 } from './modules/roles/roleRegistry.service.js';
 
 export { default as coreRoleRegistryRouter } from './modules/roles/roleRegistry.router.js';
+
+// ── Seq 4c-0: User×Function Ownership Grant (shared resolver) ─────────────────
+
+export {
+  resolveOwnedFunctionIds,
+  resolveFunctionScope,
+  grantFunctionToUser,
+  revokeFunctionGrant,
+  listFunctionGrants,
+} from './modules/userFunctionGrant/userFunctionGrant.service.js';
