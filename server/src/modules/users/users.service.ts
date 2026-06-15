@@ -11,7 +11,6 @@ export async function getUsers(tenantId: string) {
       first_name: true,
       last_name: true,
       role: true,
-      function_id: true,
       location_id: true,
       is_active: true,
       last_login_at: true,
@@ -32,6 +31,9 @@ export async function updateUser(
   userId: string,
   actorId: string,
   role: string,
+  // 5B: function_id column dropped from core_users — the function axis lives in
+  // core_user_function_grants now. Param kept for call-site compatibility but no
+  // longer written here; grant writes happen via grantFunctionToUser.
   functionId?: string | null,
   locationId?: string | null,
 ) {
@@ -46,7 +48,6 @@ export async function updateUser(
     where: { id: userId },
     data: {
       role,
-      ...(functionId !== undefined ? { function_id: functionId || null } : {}),
       ...(locationId !== undefined ? { location_id: locationId || null } : {}),
     },
   });

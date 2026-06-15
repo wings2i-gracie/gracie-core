@@ -6,7 +6,6 @@ declare module 'express-serve-static-core' {
       role: string;
       tenantId: string | null;
       organisationId: string | null;
-      functionId: string | null;
       locationId: string | null;
       isSupportMode?: boolean;
       originalRole?: string;

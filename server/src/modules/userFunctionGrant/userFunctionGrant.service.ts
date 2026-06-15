@@ -1,8 +1,10 @@
-// Seq 4c-0: user×function ownership grant — Core-owned shared capability.
+// Seq 4c-0 / 4c-0b: user×function ownership grant — Core-owned shared capability.
 //
-// One user may own MANY functions; ownership GRANTS access. This SUPPLEMENTS
-// (does NOT replace) CoreUser.function_id. Consumers (Privacy, Compliance C-DD8)
-// must use this single implementation — no product-local copies.
+// One user may own MANY functions; ownership GRANTS access. Since 5B dropped the
+// legacy core_users.function_id column, grants are the SOLE source of the function
+// axis (existing single-function users were backfilled in 20260615000001).
+// Consumers (Privacy, Compliance C-DD8) must use this single implementation —
+// no product-local copies.
 //
 // Resolution is done fresh at request time (no JWT/token change) so new grants
 // take effect immediately without re-login.
@@ -26,21 +28,19 @@ export async function resolveOwnedFunctionIds(
 }
 
 /**
- * The full set of function IDs a user can access by function membership:
- * the UNION of their single function_id (if set) and every granted function.
+ * The full set of function IDs a user can access by function membership.
  *
- * SUPPLEMENT semantics — when the grant table is empty this returns exactly
- * `[functionId]` (or `[]` if functionId is null), i.e. bit-for-bit today's
- * single-function behaviour. Deduplicated; order-stable.
+ * Since 5B dropped core_users.function_id, this resolves PURELY from grants —
+ * the legacy single-column union arm has been removed. The `functionId` field on
+ * `user` is now vestigial: accepted for call-site compatibility but ignored.
+ * Deduplicated; order-stable.
  */
 export async function resolveFunctionScope(
   user: { id: string; functionId: string | null },
   tenantId: string,
 ): Promise<string[]> {
   const owned = await resolveOwnedFunctionIds(user.id, tenantId);
-  const set = new Set<string>(owned);
-  if (user.functionId) set.add(user.functionId);
-  return Array.from(set);
+  return Array.from(new Set<string>(owned));
 }
 
 /** Grant a user ownership of a function. Idempotent: re-granting revives a

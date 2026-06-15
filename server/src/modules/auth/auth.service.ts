@@ -19,7 +19,6 @@ export interface CoreTokenPayload {
   role: string;
   tenantId: string | null;
   organisationId: string | null;
-  functionId: string | null;
   locationId: string | null;
 }
 
@@ -35,7 +34,6 @@ export function buildTokenPayload(user: {
   role: string;
   tenant_id: string | null;
   organisation_id: string | null;
-  function_id: string | null;
   location_id: string | null;
 }): CoreTokenPayload {
   return {
@@ -44,7 +42,6 @@ export function buildTokenPayload(user: {
     role: user.role,
     tenantId: user.tenant_id,
     organisationId: user.organisation_id,
-    functionId: user.function_id,
     locationId: user.location_id,
   };
 }

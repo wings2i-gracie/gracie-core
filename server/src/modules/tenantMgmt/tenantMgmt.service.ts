@@ -263,7 +263,6 @@ export async function issueSupportModeToken(
       role: 'org_admin',
       tenantId: tenant.id,
       organisationId: null,
-      functionId: null,
       locationId: null,
       organisationName: tenant.name,
       isSupportMode: true,
