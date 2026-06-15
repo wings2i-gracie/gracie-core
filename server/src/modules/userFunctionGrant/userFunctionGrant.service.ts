@@ -44,7 +44,13 @@ export async function resolveFunctionScope(
 }
 
 /** Grant a user ownership of a function. Idempotent: re-granting revives a
- * soft-deleted grant rather than failing the unique constraint. */
+ * soft-deleted grant rather than failing the unique constraint.
+ *
+ * Tenant-ownership is enforced here (not just at the router) because this is the
+ * single shared Core write path — every consumer (Privacy, Compliance) inherits
+ * the guarantee that a user can only be granted functions within `tenantId`.
+ * Throws NOT_FOUND (status 404) if the target user or function does not belong
+ * to the tenant. */
 export async function grantFunctionToUser(params: {
   tenantId: string;
   userId: string;
@@ -52,6 +58,21 @@ export async function grantFunctionToUser(params: {
   grantedBy?: string | null;
 }): Promise<{ id: string; userId: string; functionId: string }> {
   const { tenantId, userId, functionId, grantedBy } = params;
+
+  const targetUser = await prisma.coreUser.findFirst({
+    where: { id: userId, tenant_id: tenantId, deleted_at: null },
+    select: { id: true },
+  });
+  if (!targetUser)
+    throw Object.assign(new Error('Target user not found in tenant'), { code: 'NOT_FOUND', status: 404 });
+
+  const targetFunction = await prisma.coreFunction.findFirst({
+    where: { id: functionId, tenant_id: tenantId, deleted_at: null },
+    select: { id: true },
+  });
+  if (!targetFunction)
+    throw Object.assign(new Error('Target function not found in tenant'), { code: 'NOT_FOUND', status: 404 });
+
   const existing = await prisma.coreUserFunctionGrant.findUnique({
     where: {
       tenant_id_user_id_function_id: {

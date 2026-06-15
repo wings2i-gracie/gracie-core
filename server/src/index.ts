@@ -341,3 +341,5 @@ export {
   revokeFunctionGrant,
   listFunctionGrants,
 } from './modules/userFunctionGrant/userFunctionGrant.service.js';
+
+export { default as coreUserFunctionGrantRouter } from './modules/userFunctionGrant/userFunctionGrant.router.js';
