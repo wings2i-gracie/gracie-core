@@ -24,6 +24,10 @@ export interface ListTasksFilter {
   source?: string[];
   ownerId?: string;
   functionId?: string;
+  // Seq 4c-0b STEP 4-Core: SET-based function scope (multi-grant users). Optional and
+  // additive — mutually exclusive with functionId in practice. When present (even empty)
+  // it takes precedence over functionId. See listTasks() for the three-case semantics.
+  functionIds?: string[];
   ownedOrCreatedByUserId?: string;
   dueBefore?: string;
   dueAfter?: string;
@@ -74,7 +78,17 @@ export async function listTasks(filter: ListTasksFilter) {
   if (filter.priority?.length) where.priority = { in: filter.priority as CoreTaskPriority[] };
   if (filter.source?.length) where.source = { in: filter.source as CoreTaskSource[] };
   if (filter.ownerId) where.owner_id = filter.ownerId;
-  if (filter.functionId) where.function_id = filter.functionId;
+  // Function scope (Seq 4c-0b STEP 4-Core). functionIds (SET) takes precedence over the
+  // legacy single functionId; the two are mutually exclusive in practice.
+  //   functionIds non-empty -> where.function_id = { in: functionIds }
+  //   functionIds empty []  -> impossible-match guard: scope to NOTHING (no function
+  //                            access must NOT silently widen to all tasks)
+  //   functionIds undefined -> fall through to the unchanged single-functionId behaviour
+  if (filter.functionIds !== undefined) {
+    where.function_id = filter.functionIds.length ? { in: filter.functionIds } : { in: [] };
+  } else if (filter.functionId) {
+    where.function_id = filter.functionId;
+  }
   if (filter.ownedOrCreatedByUserId) {
     where.OR = [{ owner_id: filter.ownedOrCreatedByUserId }, { created_by: filter.ownedOrCreatedByUserId }];
   }
