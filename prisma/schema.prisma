@@ -127,7 +127,6 @@ model CoreUser {
   first_name           String
   last_name            String
   role                 String
-  function_id          String?   @db.Uuid
   location_id          String?   @db.Uuid
   is_active            Boolean   @default(true)
   must_change_password Boolean   @default(false)
@@ -239,8 +238,9 @@ model CoreFunction {
   @@map("functions")
 }
 
-// Seq 4c-0: user×function ownership grant. One user may own MANY functions;
-// ownership grants access (supplements CoreUser.function_id — does NOT replace it).
+// Seq 4c-0 / 4c-0b: user×function ownership grant. One user may own MANY functions;
+// ownership grants access. Sole source of the function axis since 5B dropped the
+// legacy core_users.function_id column (grants were backfilled in 20260615000001).
 // Role-independent capability table — role-gating lives in the consuming resolver.
 // References core_users.id / functions.id as plain UUIDs (no relation objects) so
 // the CoreUser / CoreFunction models stay untouched — purely additive.

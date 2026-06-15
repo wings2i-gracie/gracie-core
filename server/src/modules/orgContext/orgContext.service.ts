@@ -289,9 +289,19 @@ export async function deactivateFunction(tenantId: string, functionId: string) {
   });
   if (!existing) throw Object.assign(new Error('Function not found'), { code: 'NOT_FOUND', status: 404 });
 
-  const assignedUsers = await prisma.coreUser.count({
-    where: { tenant_id: tenantId, function_id: functionId, is_active: true, deleted_at: null },
-  });
+  // 5B: core_users.function_id dropped — "assigned to this function" now means
+  // holding an active grant. Re-expressed onto core_user_function_grants, keeping the
+  // original active-user-only semantics (grant rows carry plain UUIDs, no relation).
+  const grantedUserIds = (await prisma.coreUserFunctionGrant.findMany({
+    where: { tenant_id: tenantId, function_id: functionId, deleted_at: null },
+    select: { user_id: true },
+  })).map((g) => g.user_id);
+
+  const assignedUsers = grantedUserIds.length
+    ? await prisma.coreUser.count({
+        where: { id: { in: grantedUserIds }, tenant_id: tenantId, is_active: true, deleted_at: null },
+      })
+    : 0;
   if (assignedUsers > 0) {
     throw Object.assign(
       new Error(`Cannot deactivate — ${assignedUsers} active user(s) are assigned to this function`),

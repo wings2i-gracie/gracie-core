@@ -6,7 +6,6 @@ interface JwtPayload {
   role: string;
   tenantId: string | null;
   organisationId: string | null;
-  functionId: string | null;
   locationId: string | null;
   isSupportMode?: boolean;
   originalRole?: string;
@@ -31,7 +30,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       role: payload.role,
       tenantId: payload.tenantId,
       organisationId: payload.organisationId,
-      functionId: payload.functionId,
       locationId: payload.locationId ?? null,
       isSupportMode: payload.isSupportMode,
       originalRole: payload.originalRole,
