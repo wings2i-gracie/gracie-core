@@ -343,3 +343,16 @@ export {
 } from './modules/userFunctionGrant/userFunctionGrant.service.js';
 
 export { default as coreUserFunctionGrantRouter } from './modules/userFunctionGrant/userFunctionGrant.router.js';
+
+// ── 1a: Jurisdiction Directory ────────────────────────────────────────────────
+
+export {
+  listJurisdictionActs,
+  getJurisdictionAct,
+  createJurisdictionAct as coreCreateJurisdictionAct,
+  updateJurisdictionAct as coreUpdateJurisdictionAct,
+  addJurisdictionRegion as coreAddJurisdictionRegion,
+  removeJurisdictionRegion as coreRemoveJurisdictionRegion,
+  type JurisdictionAct,
+  type JurisdictionActRegion,
+} from './modules/jurisdiction/jurisdiction.service.js';

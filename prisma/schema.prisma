@@ -491,8 +491,9 @@ model CoreRegulation {
   created_at          DateTime  @default(now()) @db.Timestamptz
   updated_at          DateTime  @updatedAt @db.Timestamptz
 
-  documents CoreRegulationDocument[]
-  toggles   CoreTenantRegulationToggle[]
+  documents        CoreRegulationDocument[]
+  toggles          CoreTenantRegulationToggle[]
+  jurisdictionActs CoreJurisdictionAct[]
 
   @@map("core_regulations")
 }
@@ -548,6 +549,37 @@ model CoreTenantRegulationToggle {
 
   @@unique([tenant_id, regulation_id])
   @@map("core_tenant_regulation_toggles")
+}
+
+// ─── 1a: Jurisdiction Directory (GLOBAL reference, Wings2i-maintained) ────────
+
+model CoreJurisdictionAct {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  act_name      String
+  authority     String?
+  official_url  String?
+  regulation_id String?  @db.Uuid
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz
+  updated_at    DateTime @updatedAt @db.Timestamptz
+
+  regulation CoreRegulation?             @relation(fields: [regulation_id], references: [id])
+  regions    CoreJurisdictionActRegion[]
+
+  @@map("core_jurisdiction_act")
+}
+
+model CoreJurisdictionActRegion {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  act_id       String  @db.Uuid
+  country_code String
+  region       String?
+
+  act CoreJurisdictionAct @relation(fields: [act_id], references: [id], onDelete: Cascade)
+
+  @@unique([act_id, country_code, region])
+  @@index([country_code, region])
+  @@map("core_jurisdiction_act_region")
 }
 
 // ─── E2.9: AI Configuration + Usage Logging ──────────────────────────────────
