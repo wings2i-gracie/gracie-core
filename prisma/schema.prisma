@@ -575,6 +575,13 @@ model CoreJurisdictionActRegion {
   country_code String
   region       String?
 
+  // Optional per-region authority contact (no separate authority table; GLOBAL).
+  authority_name           String?
+  authority_website        String?
+  authority_email          String?
+  authority_phone          String?
+  authority_postal_address String?
+
   act CoreJurisdictionAct @relation(fields: [act_id], references: [id], onDelete: Cascade)
 
   @@unique([act_id, country_code, region])

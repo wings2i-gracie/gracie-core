@@ -14,6 +14,11 @@ export interface JurisdictionActRegion {
   actId: string;
   countryCode: string;
   region: string | null;
+  authorityName: string | null;
+  authorityWebsite: string | null;
+  authorityEmail: string | null;
+  authorityPhone: string | null;
+  authorityPostalAddress: string | null;
 }
 
 export interface JurisdictionAct {
@@ -35,12 +40,22 @@ function mapRegion(r: {
   act_id: string;
   country_code: string;
   region: string | null;
+  authority_name?: string | null;
+  authority_website?: string | null;
+  authority_email?: string | null;
+  authority_phone?: string | null;
+  authority_postal_address?: string | null;
 }): JurisdictionActRegion {
   return {
     id: r.id,
     actId: r.act_id,
     countryCode: r.country_code,
     region: r.region ?? null,
+    authorityName: r.authority_name ?? null,
+    authorityWebsite: r.authority_website ?? null,
+    authorityEmail: r.authority_email ?? null,
+    authorityPhone: r.authority_phone ?? null,
+    authorityPostalAddress: r.authority_postal_address ?? null,
   };
 }
 
@@ -53,7 +68,17 @@ function mapAct(a: {
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
-  regions?: Array<{ id: string; act_id: string; country_code: string; region: string | null }>;
+  regions?: Array<{
+    id: string;
+    act_id: string;
+    country_code: string;
+    region: string | null;
+    authority_name?: string | null;
+    authority_website?: string | null;
+    authority_email?: string | null;
+    authority_phone?: string | null;
+    authority_postal_address?: string | null;
+  }>;
 }): JurisdictionAct {
   return {
     id: a.id,
@@ -105,7 +130,15 @@ export interface CreateJurisdictionActInput {
   officialUrl?: string | null;
   regulationId?: string | null;
   isActive?: boolean;
-  regions?: Array<{ countryCode: string; region?: string | null }>;
+  regions?: Array<{
+    countryCode: string;
+    region?: string | null;
+    authorityName?: string | null;
+    authorityWebsite?: string | null;
+    authorityEmail?: string | null;
+    authorityPhone?: string | null;
+    authorityPostalAddress?: string | null;
+  }>;
 }
 
 /** Create an act, optionally with nested regions. 400 if act_name missing,
@@ -133,6 +166,11 @@ export async function createJurisdictionAct(
               create: data.regions.map((rg) => ({
                 country_code: rg.countryCode,
                 region: rg.region ?? null,
+                authority_name: rg.authorityName ?? null,
+                authority_website: rg.authorityWebsite ?? null,
+                authority_email: rg.authorityEmail ?? null,
+                authority_phone: rg.authorityPhone ?? null,
+                authority_postal_address: rg.authorityPostalAddress ?? null,
               })),
             }
           : undefined,
@@ -187,7 +225,15 @@ export async function updateJurisdictionAct(
 /** Add one region to an act. 404 if act missing, 409 on duplicate jurisdiction. */
 export async function addJurisdictionRegion(
   actId: string,
-  data: { countryCode: string; region?: string | null },
+  data: {
+    countryCode: string;
+    region?: string | null;
+    authorityName?: string | null;
+    authorityWebsite?: string | null;
+    authorityEmail?: string | null;
+    authorityPhone?: string | null;
+    authorityPostalAddress?: string | null;
+  },
 ): Promise<JurisdictionActRegion> {
   const act = await prisma.coreJurisdictionAct.findUnique({ where: { id: actId }, select: { id: true } });
   if (!act)
@@ -202,6 +248,11 @@ export async function addJurisdictionRegion(
         act_id: actId,
         country_code: data.countryCode,
         region: data.region ?? null,
+        authority_name: data.authorityName ?? null,
+        authority_website: data.authorityWebsite ?? null,
+        authority_email: data.authorityEmail ?? null,
+        authority_phone: data.authorityPhone ?? null,
+        authority_postal_address: data.authorityPostalAddress ?? null,
       },
     });
     return mapRegion(row);
@@ -213,6 +264,46 @@ export async function addJurisdictionRegion(
       });
     throw e;
   }
+}
+
+export interface UpdateJurisdictionRegionInput {
+  authorityName?: string | null;
+  authorityWebsite?: string | null;
+  authorityEmail?: string | null;
+  authorityPhone?: string | null;
+  authorityPostalAddress?: string | null;
+}
+
+/** Update the five authority-contact fields on an existing region row. Only those
+ *  fields — country/region key are immutable here. 404 if the region is missing.
+ *  GLOBAL: no tenant param. */
+export async function updateJurisdictionRegion(
+  regionId: string,
+  data: UpdateJurisdictionRegionInput,
+): Promise<JurisdictionActRegion> {
+  const existing = await prisma.coreJurisdictionActRegion.findUnique({
+    where: { id: regionId },
+    select: { id: true },
+  });
+  if (!existing)
+    throw Object.assign(new Error('Jurisdiction region not found'), {
+      statusCode: 404,
+      code: 'NOT_FOUND',
+    });
+
+  const row = await prisma.coreJurisdictionActRegion.update({
+    where: { id: regionId },
+    data: {
+      ...(data.authorityName !== undefined ? { authority_name: data.authorityName } : {}),
+      ...(data.authorityWebsite !== undefined ? { authority_website: data.authorityWebsite } : {}),
+      ...(data.authorityEmail !== undefined ? { authority_email: data.authorityEmail } : {}),
+      ...(data.authorityPhone !== undefined ? { authority_phone: data.authorityPhone } : {}),
+      ...(data.authorityPostalAddress !== undefined
+        ? { authority_postal_address: data.authorityPostalAddress }
+        : {}),
+    },
+  });
+  return mapRegion(row);
 }
 
 /** Delete one region row. No-op if it does not exist. */

@@ -352,6 +352,7 @@ export {
   createJurisdictionAct as coreCreateJurisdictionAct,
   updateJurisdictionAct as coreUpdateJurisdictionAct,
   addJurisdictionRegion as coreAddJurisdictionRegion,
+  updateJurisdictionRegion as coreUpdateJurisdictionRegion,
   removeJurisdictionRegion as coreRemoveJurisdictionRegion,
   type JurisdictionAct,
   type JurisdictionActRegion,
