@@ -362,9 +362,10 @@ export async function removeFunction(tenantId: string, functionId: string): Prom
     prisma.$queryRaw<Array<{ count: number }>>`
       SELECT COUNT(*)::int AS count FROM privacy_training_assignments
       WHERE function_id = ${functionId}::uuid`,
+    // privacy_compliance_tracking has no deleted_at column — count all references.
     prisma.$queryRaw<Array<{ count: number }>>`
       SELECT COUNT(*)::int AS count FROM privacy_compliance_tracking
-      WHERE addressed_by_function_id = ${functionId}::uuid AND deleted_at IS NULL`,
+      WHERE addressed_by_function_id = ${functionId}::uuid`,
   ]);
 
   const blockers: Array<{ table: string; count: number }> = [];
