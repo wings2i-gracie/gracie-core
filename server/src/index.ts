@@ -74,6 +74,7 @@ export {
   createLocation,
   updateLocation,
   deactivateLocation,
+  removeLocation,
   listEntities,
   createEntity,
   updateEntity,

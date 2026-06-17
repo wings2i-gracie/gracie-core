@@ -25,7 +25,7 @@ function mapOrg(o: {
 function mapFunction(f: {
   id: string; tenant_id: string; organisation_id: string; name: string;
   description: string | null; head_user_id: string | null; created_by: string | null;
-  created_at: Date; updated_at: Date; deleted_at: Date | null;
+  created_at: Date; updated_at: Date; deleted_at: Date | null; status: string;
   head_user?: { first_name: string; last_name: string } | null;
 }) {
   return {
@@ -34,7 +34,10 @@ function mapFunction(f: {
     headUserName: f.head_user ? `${f.head_user.first_name} ${f.head_user.last_name}` : null,
     createdBy: f.created_by, createdAt: f.created_at.toISOString(),
     updatedAt: f.updated_at.toISOString(), deletedAt: f.deleted_at?.toISOString() ?? null,
-    isActive: f.deleted_at === null,
+    status: f.status,
+    // S-STATUS-MODEL: active state now derives from status, not deleted_at
+    // (deactivated functions keep deleted_at NULL).
+    isActive: f.status === 'active',
   };
 }
 
@@ -42,14 +45,18 @@ function mapLocation(l: {
   id: string; tenant_id: string; organisation_id: string; name: string; country_code: string;
   region: string | null; is_data_subject_location: boolean; is_processing_location: boolean;
   is_active: boolean; created_by: string | null; created_at: Date; updated_at: Date;
+  deleted_at: Date | null; status: string;
 }) {
   return {
     id: l.id, tenantId: l.tenant_id, organisationId: l.organisation_id,
     name: l.name, countryCode: l.country_code, region: l.region,
     isDataSubjectLocation: l.is_data_subject_location,
     isProcessingLocation: l.is_processing_location,
-    isActive: l.is_active, createdBy: l.created_by,
+    status: l.status,
+    // S-STATUS-MODEL: active state derives from status (is_active kept in sync).
+    isActive: l.status === 'active', createdBy: l.created_by,
     createdAt: l.created_at.toISOString(), updatedAt: l.updated_at.toISOString(),
+    deletedAt: l.deleted_at?.toISOString() ?? null,
   };
 }
 
@@ -228,10 +235,12 @@ export async function upsertDpoDetails(
 // ── Functions ─────────────────────────────────────────────────────────────────
 
 export async function listFunctions(tenantId: string, includeInactive = false) {
+  // S-STATUS-MODEL: filter on status, never deleted_at. includeInactive=false →
+  // active only; includeInactive=true → active + deactivated (never 'removed').
   const fns = await prisma.coreFunction.findMany({
     where: {
       tenant_id: tenantId,
-      ...(includeInactive ? {} : { deleted_at: null }),
+      status: includeInactive ? { in: ['active', 'deactivated'] } : 'active',
     },
     include: { head_user: { select: { first_name: true, last_name: true } } },
     orderBy: { name: 'asc' },
@@ -284,8 +293,9 @@ export async function updateFunction(
 }
 
 export async function deactivateFunction(tenantId: string, functionId: string) {
+  // S-STATUS-MODEL: only an active function can be deactivated.
   const existing = await prisma.coreFunction.findFirst({
-    where: { id: functionId, tenant_id: tenantId, deleted_at: null },
+    where: { id: functionId, tenant_id: tenantId, status: 'active' },
   });
   if (!existing) throw Object.assign(new Error('Function not found'), { code: 'NOT_FOUND', status: 404 });
 
@@ -309,9 +319,11 @@ export async function deactivateFunction(tenantId: string, functionId: string) {
     );
   }
 
+  // S-STATUS-MODEL: deactivate marks status only — deleted_at stays NULL (reversible,
+  // not on the purge clock).
   await prisma.coreFunction.update({
     where: { id: functionId },
-    data: { deleted_at: new Date() },
+    data: { status: 'deactivated' },
   });
 }
 
@@ -324,8 +336,9 @@ export async function deactivateFunction(tenantId: string, functionId: string) {
 // Core schema, so they are counted via parameterised raw SQL (function id is
 // always a bound parameter, never interpolated).
 export async function removeFunction(tenantId: string, functionId: string): Promise<void> {
+  // S-STATUS-MODEL: only an active function can be removed.
   const existing = await prisma.coreFunction.findFirst({
-    where: { id: functionId, tenant_id: tenantId, deleted_at: null },
+    where: { id: functionId, tenant_id: tenantId, status: 'active' },
   });
   if (!existing) throw Object.assign(new Error('Function not found'), { code: 'NOT_FOUND', status: 404 });
 
@@ -389,10 +402,12 @@ export async function removeFunction(tenantId: string, functionId: string): Prom
   }
 
   // Soft-delete the function and hard-delete its FK-less grants atomically.
+  // S-STATUS-MODEL: status='removed' marks it removed; deleted_at starts the
+  // 30-day purge clock.
   await prisma.$transaction([
     prisma.coreFunction.update({
       where: { id: functionId },
-      data: { deleted_at: new Date() },
+      data: { status: 'removed', deleted_at: new Date() },
     }),
     prisma.coreUserFunctionGrant.deleteMany({
       where: { tenant_id: tenantId, function_id: functionId },
@@ -407,8 +422,10 @@ export async function listLocations(
   includeInactive = false,
   type?: 'processing' | 'data_subject',
 ) {
+  // S-STATUS-MODEL: filter on status (not is_active). active only → 'active';
+  // includeInactive → active + deactivated (never 'removed').
   const where: Record<string, unknown> = { tenant_id: tenantId };
-  if (!includeInactive) where.is_active = true;
+  where.status = includeInactive ? { in: ['active', 'deactivated'] } : 'active';
   if (type === 'processing') where.is_processing_location = true;
   if (type === 'data_subject') where.is_data_subject_location = true;
   const locs = await prisma.coreLocation.findMany({ where, orderBy: { name: 'asc' } });
@@ -481,8 +498,9 @@ export async function updateLocation(
 }
 
 export async function deactivateLocation(tenantId: string, locationId: string) {
+  // S-STATUS-MODEL: only an active location can be deactivated.
   const existing = await prisma.coreLocation.findFirst({
-    where: { id: locationId, tenant_id: tenantId },
+    where: { id: locationId, tenant_id: tenantId, status: 'active' },
   });
   if (!existing) throw Object.assign(new Error('Location not found'), { code: 'NOT_FOUND', status: 404 });
 
@@ -496,9 +514,80 @@ export async function deactivateLocation(tenantId: string, locationId: string) {
     );
   }
 
+  // S-STATUS-MODEL: keep is_active in sync with status (legacy callers still read it).
   await prisma.coreLocation.update({
     where: { id: locationId },
-    data: { is_active: false },
+    data: { status: 'deactivated', is_active: false },
+  });
+}
+
+// Permanent Remove for locations — mirrors removeFunction. Gated by a six-table
+// dependency check (one Core table + five privacy_* tables counted via parameterised
+// raw SQL; the privacy_* tables live in the same DB but outside the Core schema).
+// NONE of the five privacy_* location-dependency tables carry a deleted_at column
+// (verified against the live schema — same caution applied in the
+// privacy_compliance_tracking fix), so each is counted in full. No grant cleanup —
+// there is no user×location grant table. On success: status='removed',
+// deleted_at=now() (purge clock), is_active=false (kept in sync).
+export async function removeLocation(tenantId: string, locationId: string): Promise<void> {
+  const existing = await prisma.coreLocation.findFirst({
+    where: { id: locationId, tenant_id: tenantId, status: 'active' },
+  });
+  if (!existing) throw Object.assign(new Error('Location not found'), { code: 'NOT_FOUND', status: 404 });
+
+  const [
+    referencedUsers,
+    contextLocRows,
+    subjectLocRows,
+    storageRows,
+    processingRows,
+    transferRows,
+  ] = await Promise.all([
+    // core_users.location_id — active users only (same as deactivate).
+    prisma.coreUser.count({
+      where: { tenant_id: tenantId, location_id: locationId, is_active: true, deleted_at: null },
+    }),
+    // The five privacy_* tables have no deleted_at — count all references.
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_pi_context_locations
+      WHERE location_id = ${locationId}::uuid`,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_pi_subject_locations
+      WHERE location_id = ${locationId}::uuid`,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_pi_storage_systems
+      WHERE location_id = ${locationId}::uuid`,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_pi_processing_systems
+      WHERE location_id = ${locationId}::uuid`,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_pi_transfers
+      WHERE location_id = ${locationId}::uuid`,
+  ]);
+
+  const blockers: Array<{ table: string; count: number }> = [];
+  if (referencedUsers > 0) blockers.push({ table: 'Assigned Users', count: referencedUsers });
+  const contextCount = Number(contextLocRows[0]?.count ?? 0);
+  if (contextCount > 0) blockers.push({ table: 'PI Contexts', count: contextCount });
+  const subjectCount = Number(subjectLocRows[0]?.count ?? 0);
+  if (subjectCount > 0) blockers.push({ table: 'Subject Locations', count: subjectCount });
+  const storageCount = Number(storageRows[0]?.count ?? 0);
+  if (storageCount > 0) blockers.push({ table: 'Storage Systems', count: storageCount });
+  const processingCount = Number(processingRows[0]?.count ?? 0);
+  if (processingCount > 0) blockers.push({ table: 'Processing Systems', count: processingCount });
+  const transferCount = Number(transferRows[0]?.count ?? 0);
+  if (transferCount > 0) blockers.push({ table: 'Transfers', count: transferCount });
+
+  if (blockers.length > 0) {
+    throw Object.assign(
+      new Error('Location cannot be removed — it is referenced by active records'),
+      { code: 'LOCATION_IN_USE', status: 409, blockers },
+    );
+  }
+
+  await prisma.coreLocation.update({
+    where: { id: locationId },
+    data: { status: 'removed', deleted_at: new Date(), is_active: false },
   });
 }
 

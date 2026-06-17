@@ -230,6 +230,10 @@ model CoreFunction {
   created_at      DateTime  @default(now()) @db.Timestamptz
   updated_at      DateTime  @updatedAt @db.Timestamptz
   deleted_at      DateTime? @db.Timestamptz
+  // S-STATUS-MODEL: authoritative lifecycle signal — 'active' | 'deactivated' | 'removed'.
+  // App-level validation only (lesson 17 varchar pattern). deactivate → 'deactivated'
+  // (deleted_at NULL); remove → 'removed' (deleted_at = now(), starts purge clock).
+  status          String    @default("active")
 
   head_user CoreUser?  @relation("CoreFunctionHead", fields: [head_user_id], references: [id])
   tasks     CoreTask[]
@@ -272,6 +276,10 @@ model CoreLocation {
   created_by               String?  @db.Uuid
   created_at               DateTime @default(now()) @db.Timestamptz
   updated_at               DateTime @updatedAt @db.Timestamptz
+  // S-STATUS-MODEL: status mirrors CoreFunction; deleted_at is net-new for locations
+  // (previously only is_active existed). is_active kept in sync with status.
+  deleted_at               DateTime? @db.Timestamptz
+  status                   String   @default("active")
 
   @@index([tenant_id])
   @@map("locations")
