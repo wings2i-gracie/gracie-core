@@ -315,6 +315,90 @@ export async function deactivateFunction(tenantId: string, functionId: string) {
   });
 }
 
+// Permanent Remove (soft-delete + grant cleanup), gated by a six-table dependency
+// check. Distinct from deactivateFunction (reversible). Blocks when ANY active
+// reference exists in the six dependency tables; on success soft-deletes the
+// function and hard-deletes its (FK-less) user-function grants so they cannot
+// dangle. core_user_function_grants is modelled in the Core Prisma client; the
+// five privacy_* tables are NOT — they live in the same database but outside the
+// Core schema, so they are counted via parameterised raw SQL (function id is
+// always a bound parameter, never interpolated).
+export async function removeFunction(tenantId: string, functionId: string): Promise<void> {
+  const existing = await prisma.coreFunction.findFirst({
+    where: { id: functionId, tenant_id: tenantId, deleted_at: null },
+  });
+  if (!existing) throw Object.assign(new Error('Function not found'), { code: 'NOT_FOUND', status: 404 });
+
+  // Grant check mirrors deactivateFunction: a grant blocks only when its user is
+  // still an active user (active-user-faithful, two-query).
+  const grantedUserIds = (await prisma.coreUserFunctionGrant.findMany({
+    where: { tenant_id: tenantId, function_id: functionId, deleted_at: null },
+    select: { user_id: true },
+  })).map((g) => g.user_id);
+
+  const [
+    assignedUsers,
+    piContextRows,
+    taskRows,
+    stakeholderRows,
+    trainingRows,
+    complianceRows,
+  ] = await Promise.all([
+    grantedUserIds.length
+      ? prisma.coreUser.count({
+          where: { id: { in: grantedUserIds }, tenant_id: tenantId, is_active: true, deleted_at: null },
+        })
+      : Promise.resolve(0),
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_pi_contexts
+      WHERE function_id = ${functionId}::uuid AND deleted_at IS NULL`,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_tasks
+      WHERE function_id = ${functionId}::uuid AND deleted_at IS NULL`,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_org_stakeholders
+      WHERE function_id = ${functionId}::uuid AND deleted_at IS NULL`,
+    // privacy_training_assignments has no deleted_at column — count all references.
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_training_assignments
+      WHERE function_id = ${functionId}::uuid`,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM privacy_compliance_tracking
+      WHERE addressed_by_function_id = ${functionId}::uuid AND deleted_at IS NULL`,
+  ]);
+
+  const blockers: Array<{ table: string; count: number }> = [];
+  if (assignedUsers > 0) blockers.push({ table: 'Assigned Users', count: assignedUsers });
+  const piCount = Number(piContextRows[0]?.count ?? 0);
+  if (piCount > 0) blockers.push({ table: 'PI Contexts', count: piCount });
+  const taskCount = Number(taskRows[0]?.count ?? 0);
+  if (taskCount > 0) blockers.push({ table: 'Tasks', count: taskCount });
+  const stakeholderCount = Number(stakeholderRows[0]?.count ?? 0);
+  if (stakeholderCount > 0) blockers.push({ table: 'Stakeholders', count: stakeholderCount });
+  const trainingCount = Number(trainingRows[0]?.count ?? 0);
+  if (trainingCount > 0) blockers.push({ table: 'Training Assignments', count: trainingCount });
+  const complianceCount = Number(complianceRows[0]?.count ?? 0);
+  if (complianceCount > 0) blockers.push({ table: 'Compliance Records', count: complianceCount });
+
+  if (blockers.length > 0) {
+    throw Object.assign(
+      new Error('Function cannot be removed — it is referenced by active records'),
+      { code: 'FUNCTION_IN_USE', status: 409, blockers },
+    );
+  }
+
+  // Soft-delete the function and hard-delete its FK-less grants atomically.
+  await prisma.$transaction([
+    prisma.coreFunction.update({
+      where: { id: functionId },
+      data: { deleted_at: new Date() },
+    }),
+    prisma.coreUserFunctionGrant.deleteMany({
+      where: { tenant_id: tenantId, function_id: functionId },
+    }),
+  ]);
+}
+
 // ── Locations ─────────────────────────────────────────────────────────────────
 
 export async function listLocations(

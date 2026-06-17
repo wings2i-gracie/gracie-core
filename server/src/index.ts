@@ -68,6 +68,7 @@ export {
   createFunction,
   updateFunction,
   deactivateFunction,
+  removeFunction,
   listLocations,
   getLocationsByFunction,
   createLocation,
