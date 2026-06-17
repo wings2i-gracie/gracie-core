@@ -267,6 +267,8 @@ export async function addJurisdictionRegion(
 }
 
 export interface UpdateJurisdictionRegionInput {
+  countryCode?: string;
+  region?: string | null;
   authorityName?: string | null;
   authorityWebsite?: string | null;
   authorityEmail?: string | null;
@@ -274,16 +276,19 @@ export interface UpdateJurisdictionRegionInput {
   authorityPostalAddress?: string | null;
 }
 
-/** Update the five authority-contact fields on an existing region row. Only those
- *  fields — country/region key are immutable here. 404 if the region is missing.
- *  GLOBAL: no tenant param. */
+/** Update an existing region row. The five authority-contact fields are always
+ *  editable; the jurisdiction key (country_code/region) may also be changed here
+ *  (it stays immutable on createJurisdictionAct's nested path and addJurisdictionRegion).
+ *  404 if the region is missing. When the key changes, a pre-flight duplicate guard
+ *  rejects a clashing (act_id, country_code, region) with a typed 409 — the DB
+ *  uniqueness constraint remains the source of truth. GLOBAL: no tenant param. */
 export async function updateJurisdictionRegion(
   regionId: string,
   data: UpdateJurisdictionRegionInput,
 ): Promise<JurisdictionActRegion> {
   const existing = await prisma.coreJurisdictionActRegion.findUnique({
     where: { id: regionId },
-    select: { id: true },
+    select: { id: true, act_id: true, country_code: true, region: true },
   });
   if (!existing)
     throw Object.assign(new Error('Jurisdiction region not found'), {
@@ -291,19 +296,50 @@ export async function updateJurisdictionRegion(
       code: 'NOT_FOUND',
     });
 
-  const row = await prisma.coreJurisdictionActRegion.update({
-    where: { id: regionId },
-    data: {
-      ...(data.authorityName !== undefined ? { authority_name: data.authorityName } : {}),
-      ...(data.authorityWebsite !== undefined ? { authority_website: data.authorityWebsite } : {}),
-      ...(data.authorityEmail !== undefined ? { authority_email: data.authorityEmail } : {}),
-      ...(data.authorityPhone !== undefined ? { authority_phone: data.authorityPhone } : {}),
-      ...(data.authorityPostalAddress !== undefined
-        ? { authority_postal_address: data.authorityPostalAddress }
-        : {}),
-    },
-  });
-  return mapRegion(row);
+  // Pre-flight duplicate guard: only when the jurisdiction key is changing.
+  if (data.countryCode !== undefined || data.region !== undefined) {
+    const nextCountry = data.countryCode ?? existing.country_code;
+    const nextRegion = data.region !== undefined ? data.region : existing.region;
+    const clash = await prisma.coreJurisdictionActRegion.findFirst({
+      where: {
+        act_id: existing.act_id,
+        country_code: nextCountry,
+        region: nextRegion,
+        id: { not: regionId },
+      },
+      select: { id: true },
+    });
+    if (clash)
+      throw Object.assign(new Error('Duplicate jurisdiction for this act'), {
+        statusCode: 409,
+        code: 'DUPLICATE_JURISDICTION',
+      });
+  }
+
+  try {
+    const row = await prisma.coreJurisdictionActRegion.update({
+      where: { id: regionId },
+      data: {
+        ...(data.countryCode !== undefined ? { country_code: data.countryCode } : {}),
+        ...(data.region !== undefined ? { region: data.region } : {}),
+        ...(data.authorityName !== undefined ? { authority_name: data.authorityName } : {}),
+        ...(data.authorityWebsite !== undefined ? { authority_website: data.authorityWebsite } : {}),
+        ...(data.authorityEmail !== undefined ? { authority_email: data.authorityEmail } : {}),
+        ...(data.authorityPhone !== undefined ? { authority_phone: data.authorityPhone } : {}),
+        ...(data.authorityPostalAddress !== undefined
+          ? { authority_postal_address: data.authorityPostalAddress }
+          : {}),
+      },
+    });
+    return mapRegion(row);
+  } catch (e) {
+    if (isP2002(e))
+      throw Object.assign(new Error('Duplicate jurisdiction for this act'), {
+        statusCode: 409,
+        code: 'DUPLICATE_JURISDICTION',
+      });
+    throw e;
+  }
 }
 
 /** Delete one region row. No-op if it does not exist. */
