@@ -330,12 +330,17 @@ export async function listLocations(
   return locs.map(mapLocation);
 }
 
-export async function getLocationsByFunction(tenantId: string, _functionId: string): Promise<string[]> {
+export async function getLocationsByFunction(
+  tenantId: string,
+  _functionId: string,
+): Promise<Array<{ countryCode: string; region: string | null }>> {
   const locs = await prisma.coreLocation.findMany({
     where: { tenant_id: tenantId, is_active: true },
-    select: { country_code: true },
+    select: { country_code: true, region: true },
   });
-  return locs.map((l) => l.country_code).filter(Boolean);
+  return locs
+    .filter((l) => l.country_code)
+    .map((l) => ({ countryCode: l.country_code, region: l.region ?? null }));
 }
 
 export async function createLocation(
