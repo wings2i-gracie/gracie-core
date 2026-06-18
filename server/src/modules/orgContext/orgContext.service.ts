@@ -327,6 +327,26 @@ export async function deactivateFunction(tenantId: string, functionId: string) {
   });
 }
 
+// S-REACTIVATE: reverse of deactivateFunction — restore a deactivated function to
+// active. Only a status='deactivated' row (which by invariant has deleted_at NULL)
+// is eligible; an 'active' row is a no-op and a 'removed' row (deleted_at set) is out
+// of scope — both raise a typed 409. deleted_at is never touched.
+export async function reactivateFunction(tenantId: string, functionId: string) {
+  const existing = await prisma.coreFunction.findFirst({
+    where: { id: functionId, tenant_id: tenantId, status: 'deactivated', deleted_at: null },
+  });
+  if (!existing) {
+    throw Object.assign(
+      new Error('Function cannot be reactivated — it is not in a deactivated state'),
+      { code: 'FUNCTION_NOT_DEACTIVATED', status: 409 },
+    );
+  }
+  await prisma.coreFunction.update({
+    where: { id: functionId },
+    data: { status: 'active' },
+  });
+}
+
 // Permanent Remove (soft-delete + grant cleanup), gated by a six-table dependency
 // check. Distinct from deactivateFunction (reversible). Blocks when ANY active
 // reference exists in the six dependency tables; on success soft-deletes the
@@ -518,6 +538,26 @@ export async function deactivateLocation(tenantId: string, locationId: string) {
   await prisma.coreLocation.update({
     where: { id: locationId },
     data: { status: 'deactivated', is_active: false },
+  });
+}
+
+// S-REACTIVATE: reverse of deactivateLocation — restore a deactivated location to
+// active and bring is_active back in sync (legacy callers still read it). Only a
+// status='deactivated' row (deleted_at NULL by invariant) is eligible; 'active' and
+// 'removed' rows raise a typed 409. deleted_at is never touched.
+export async function reactivateLocation(tenantId: string, locationId: string) {
+  const existing = await prisma.coreLocation.findFirst({
+    where: { id: locationId, tenant_id: tenantId, status: 'deactivated', deleted_at: null },
+  });
+  if (!existing) {
+    throw Object.assign(
+      new Error('Location cannot be reactivated — it is not in a deactivated state'),
+      { code: 'LOCATION_NOT_DEACTIVATED', status: 409 },
+    );
+  }
+  await prisma.coreLocation.update({
+    where: { id: locationId },
+    data: { status: 'active', is_active: true },
   });
 }
 
