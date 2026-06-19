@@ -8,7 +8,8 @@ import prisma from '../../lib/prisma.js';
 function mapOrg(o: {
   id: string; tenant_id: string; name: string; website: string | null;
   address: string | null; contact_email: string | null; contact_phone: string | null;
-  industry_sector: string | null; employee_band: string | null;
+  // Batch B (#5): industry_sector is now a Postgres text[] (NOT NULL DEFAULT '{}').
+  industry_sector: string[]; employee_band: string | null;
   is_sdf: boolean; is_consent_manager: boolean; created_by: string | null;
   created_at: Date; updated_at: Date; deleted_at: Date | null;
 }) {
@@ -118,7 +119,8 @@ export async function upsertOrgProfile(
     address?: string | null;
     contactEmail?: string | null;
     contactPhone?: string | null;
-    industrySector?: string | null;
+    // Batch B (#5): multi-select industry sectors stored as text[].
+    industrySector?: string[];
     employeeBand?: string | null;
     isSdf?: boolean;
     isConsentManager?: boolean;
@@ -153,7 +155,8 @@ export async function upsertOrgProfile(
         address: data.address ?? null,
         contact_email: data.contactEmail ?? null,
         contact_phone: data.contactPhone ?? null,
-        industry_sector: data.industrySector ?? null,
+        // Batch B (#5): text[] column — default to an empty array, never null.
+        industry_sector: data.industrySector ?? [],
         employee_band: data.employeeBand ?? null,
         is_sdf: data.isSdf ?? false,
         is_consent_manager: data.isConsentManager ?? false,
@@ -256,6 +259,17 @@ export async function createFunction(
   const org = await prisma.coreOrgProfile.findFirst({ where: { tenant_id: tenantId, deleted_at: null } });
   if (!org) throw Object.assign(new Error('Organisation not found — complete wizard first'), { code: 'ORG_NOT_FOUND', status: 400 });
 
+  // Batch B (#6): app-level duplicate-name guard (no DB unique index yet). Exact
+  // name match, case-insensitive, tenant-scoped, deleted_at IS NULL (blocks against
+  // active + deactivated; a 'removed' function always carries deleted_at, so its name
+  // is free to reuse).
+  const dup = await prisma.coreFunction.findFirst({
+    where: { tenant_id: tenantId, deleted_at: null, name: { equals: data.name.trim(), mode: 'insensitive' } },
+  });
+  if (dup) {
+    throw Object.assign(new Error('A function with this name already exists'), { code: 'FUNCTION_NAME_DUPLICATE', status: 409 });
+  }
+
   const fn = await prisma.coreFunction.create({
     data: {
       tenant_id: tenantId,
@@ -279,6 +293,21 @@ export async function updateFunction(
     where: { id: functionId, tenant_id: tenantId, deleted_at: null },
   });
   if (!existing) throw Object.assign(new Error('Function not found'), { code: 'NOT_FOUND', status: 404 });
+
+  // Batch B (#6): duplicate-name guard on rename — only when a (changed) name is
+  // provided. Excludes self; same tenant-scoped, case-insensitive, deleted_at IS NULL
+  // predicate as createFunction.
+  if (data.name !== undefined && data.name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+    const dup = await prisma.coreFunction.findFirst({
+      where: {
+        tenant_id: tenantId, deleted_at: null, id: { not: functionId },
+        name: { equals: data.name.trim(), mode: 'insensitive' },
+      },
+    });
+    if (dup) {
+      throw Object.assign(new Error('A function with this name already exists'), { code: 'FUNCTION_NAME_DUPLICATE', status: 409 });
+    }
+  }
 
   const fn = await prisma.coreFunction.update({
     where: { id: functionId },
@@ -476,6 +505,15 @@ export async function createLocation(
   const org = await prisma.coreOrgProfile.findFirst({ where: { tenant_id: tenantId, deleted_at: null } });
   if (!org) throw Object.assign(new Error('Organisation not found — complete wizard first'), { code: 'ORG_NOT_FOUND', status: 400 });
 
+  // Batch B (#6): app-level duplicate-name guard (no DB unique index yet). Same
+  // tenant-scoped, case-insensitive, deleted_at IS NULL predicate as functions.
+  const dup = await prisma.coreLocation.findFirst({
+    where: { tenant_id: tenantId, deleted_at: null, name: { equals: data.name.trim(), mode: 'insensitive' } },
+  });
+  if (dup) {
+    throw Object.assign(new Error('A location with this name already exists'), { code: 'LOCATION_NAME_DUPLICATE', status: 409 });
+  }
+
   const loc = await prisma.coreLocation.create({
     data: {
       tenant_id: tenantId,
@@ -503,6 +541,20 @@ export async function updateLocation(
     where: { id: locationId, tenant_id: tenantId },
   });
   if (!existing) throw Object.assign(new Error('Location not found'), { code: 'NOT_FOUND', status: 404 });
+
+  // Batch B (#6): duplicate-name guard on rename — only when a (changed) name is
+  // provided. Excludes self.
+  if (data.name !== undefined && data.name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+    const dup = await prisma.coreLocation.findFirst({
+      where: {
+        tenant_id: tenantId, deleted_at: null, id: { not: locationId },
+        name: { equals: data.name.trim(), mode: 'insensitive' },
+      },
+    });
+    if (dup) {
+      throw Object.assign(new Error('A location with this name already exists'), { code: 'LOCATION_NAME_DUPLICATE', status: 409 });
+    }
+  }
 
   const loc = await prisma.coreLocation.update({
     where: { id: locationId },
@@ -652,6 +704,15 @@ export async function createEntity(
   const org = await prisma.coreOrgProfile.findFirst({ where: { tenant_id: tenantId, deleted_at: null } });
   if (!org) throw Object.assign(new Error('Organisation not found — complete wizard first'), { code: 'ORG_NOT_FOUND', status: 400 });
 
+  // Batch B (#6): app-level duplicate-name guard (no DB unique index yet). Same
+  // tenant-scoped, case-insensitive, deleted_at IS NULL predicate as functions/locations.
+  const dup = await prisma.coreEntity.findFirst({
+    where: { tenant_id: tenantId, deleted_at: null, name: { equals: data.name.trim(), mode: 'insensitive' } },
+  });
+  if (dup) {
+    throw Object.assign(new Error('An entity with this name already exists'), { code: 'ENTITY_NAME_DUPLICATE', status: 409 });
+  }
+
   if (data.isPrimary) {
     await prisma.coreEntity.updateMany({
       where: { tenant_id: tenantId, is_primary: true, deleted_at: null },
@@ -682,6 +743,20 @@ export async function updateEntity(
     where: { id: entityId, tenant_id: tenantId, deleted_at: null },
   });
   if (!existing) throw Object.assign(new Error('Entity not found'), { code: 'NOT_FOUND', status: 404 });
+
+  // Batch B (#6): duplicate-name guard on rename — only when a (changed) name is
+  // provided. Excludes self.
+  if (data.name !== undefined && data.name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+    const dup = await prisma.coreEntity.findFirst({
+      where: {
+        tenant_id: tenantId, deleted_at: null, id: { not: entityId },
+        name: { equals: data.name.trim(), mode: 'insensitive' },
+      },
+    });
+    if (dup) {
+      throw Object.assign(new Error('An entity with this name already exists'), { code: 'ENTITY_NAME_DUPLICATE', status: 409 });
+    }
+  }
 
   if (data.isPrimary) {
     await prisma.coreEntity.updateMany({

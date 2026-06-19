@@ -206,7 +206,7 @@ model CoreOrgProfile {
   address            String?
   contact_email      String?
   contact_phone      String?
-  industry_sector    String?
+  industry_sector    String[]  @default([])
   employee_band      String?
   is_sdf             Boolean   @default(false)
   is_consent_manager Boolean   @default(false)
