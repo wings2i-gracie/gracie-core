@@ -35,8 +35,10 @@ export {
   getUserById,
   updateUser,
   deactivateUser,
+  deleteUserCleanOrSoft,
   resetPassword,
 } from './modules/users/users.service.js';
+export type { DeleteUserResult } from './modules/users/users.service.js';
 
 export {
   auditLog,
