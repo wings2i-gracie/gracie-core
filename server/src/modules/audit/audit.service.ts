@@ -3,7 +3,30 @@ import prisma from '../../lib/prisma.js';
 
 export { type AuditLogParams };
 
+// RFC-4122 UUID shape (any version). Audit actor must be a real core_users.id;
+// the legacy `userId: 'system'` / empty-string actors are NOT valid here.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function auditLog(params: AuditLogParams): Promise<void> {
+  // F1/F2: malformed actor is a programming/wiring error, NOT a transient DB
+  // fault — fail LOUD and distinct so it can never be silently swallowed again
+  // (the old behaviour: a non-UUID actor reached Postgres, was rejected as
+  // 22P02, and got eaten by the generic catch → action went unrecorded).
+  if (typeof params.userId !== 'string' || !UUID_RE.test(params.userId)) {
+    console.error(
+      `[auditLog] INVALID ACTOR — write rejected. userId=${JSON.stringify(
+        params.userId,
+      )} action=${params.action} module=${params.module}. ` +
+        'Automated/cron callers must pass SYSTEM_ACTOR_USER_ID.',
+    );
+    throw new Error(
+      `[auditLog] INVALID ACTOR: userId must be a valid UUID, got ${JSON.stringify(
+        params.userId,
+      )}`,
+    );
+  }
+
   try {
     await prisma.coreAuditLog.create({
       data: {
@@ -17,6 +40,9 @@ export async function auditLog(params: AuditLogParams): Promise<void> {
         before_state: params.before ?? undefined,
         after_state: params.after ?? undefined,
         ip_address: params.ipAddress ?? null,
+        actor_name: params.actorName ?? null,
+        actor_email: params.actorEmail ?? null,
+        actor_role: params.actorRole ?? null,
       },
     });
   } catch (err) {
@@ -82,15 +108,22 @@ export async function exportAuditLogsAsCsv(
 
   return [
     'Date,User,Email,Action,Module,Record ID',
-    ...logs.map(l =>
-      [
+    ...logs.map(l => {
+      // F1: user can now be null (FK SetNull after a hard-delete) — fall back to the
+      // snapshotted actor identity captured at write time so the export never NPEs and
+      // attribution is preserved.
+      const name = l.user
+        ? `${l.user.first_name} ${l.user.last_name}`
+        : l.actor_name ?? 'System';
+      const email = l.user ? l.user.email : l.actor_email ?? '';
+      return [
         l.created_at.toISOString(),
-        `${l.user.first_name} ${l.user.last_name}`,
-        l.user.email,
+        name,
+        email,
         l.action,
         l.module,
         l.record_id ?? '',
-      ].map(v => `"${v}"`).join(','),
-    ),
+      ].map(v => `"${v}"`).join(',');
+    }),
   ].join('\n');
 }

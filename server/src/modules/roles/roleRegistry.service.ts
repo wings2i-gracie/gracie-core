@@ -25,6 +25,17 @@ const CORE_ROLES: RoleRegistration[] = [
   { roleKey: 'viewer',             label: 'Viewer',             productKey: 'core', configurable: true,  notifiable: false },
 ];
 
+/**
+ * Platform/automation actor role (S-SUPERADMIN-PHASE1, D-D). The seeded System
+ * core_users row carries this role. It is a NON-LOGIN actor: deliberately kept
+ * OUT of the role registry map so it never appears in ANY map-derived list
+ * (getAllRoleKeys → permissions matrix seeding, getConfigurableRoleKeys → matrix
+ * UI, getNotifiableRoleKeys → notification prefs, listRegisteredRoles). It is
+ * therefore never assignable/selectable by a tenant admin, yet isKnownRole()
+ * recognises it (see below) so the seeded user's role validates.
+ */
+export const SYSTEM_ROLE = 'system';
+
 const roleRegistry = new Map<string, RoleRegistration>(
   CORE_ROLES.map(r => [r.roleKey, r]),
 );
@@ -54,9 +65,14 @@ export function getAllRoleKeys(): string[] {
   return Array.from(roleRegistry.keys());
 }
 
-/** True if the role key is known to the registry (safe allow-list check). */
+/**
+ * True if the role key is known (safe allow-list check). The SYSTEM_ROLE is
+ * recognised here even though it is intentionally absent from the registry map,
+ * so the seeded non-login System actor's role validates — but it stays excluded
+ * from every selectable/assignable role list.
+ */
 export function isKnownRole(roleKey: string): boolean {
-  return roleRegistry.has(roleKey);
+  return roleRegistry.has(roleKey) || roleKey === SYSTEM_ROLE;
 }
 
 /** Role keys that should appear in the Permissions Matrix UI (excludes super_admin / org_admin). */

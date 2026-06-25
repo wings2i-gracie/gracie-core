@@ -333,8 +333,15 @@ export {
   isKnownRole,
   getConfigurableRoleKeys,
   getNotifiableRoleKeys,
+  SYSTEM_ROLE,
   type RoleRegistration,
 } from './modules/roles/roleRegistry.service.js';
+
+// S-SUPERADMIN-PHASE1 (D-D): canonical platform/automation audit-actor id.
+// Defined in @wings2i-gracie/contracts (the shared base layer) and re-exported
+// here so Core consumers can import it from the Core surface; Privacy cron sites
+// import the same symbol directly from contracts.
+export { SYSTEM_ACTOR_USER_ID } from '@wings2i-gracie/contracts';
 
 export { default as coreRoleRegistryRouter } from './modules/roles/roleRegistry.router.js';
 
