@@ -331,6 +331,8 @@ export {
   listRegisteredRoles,
   getAllRoleKeys,
   isKnownRole,
+  getAssignableRoleKeys,
+  isAssignableRole,
   getConfigurableRoleKeys,
   getNotifiableRoleKeys,
   SYSTEM_ROLE,

@@ -75,6 +75,21 @@ export function isKnownRole(roleKey: string): boolean {
   return roleRegistry.has(roleKey) || roleKey === SYSTEM_ROLE;
 }
 
+/**
+ * Role keys that may be ASSIGNED to a user via admin user-write endpoints
+ * (create user, update role, invite). Excludes the platform-only super_admin
+ * and (inherently, since it is never in the registry map) the non-login system
+ * actor. org_admin remains assignable.
+ */
+export function getAssignableRoleKeys(): string[] {
+  return getAllRoleKeys().filter(r => r !== 'super_admin');
+}
+
+/** Convenience guard for call sites: true if the role may be assigned via a user-write endpoint. */
+export function isAssignableRole(roleKey: string): boolean {
+  return getAssignableRoleKeys().includes(roleKey);
+}
+
 /** Role keys that should appear in the Permissions Matrix UI (excludes super_admin / org_admin). */
 export function getConfigurableRoleKeys(): string[] {
   return Array.from(roleRegistry.values())
